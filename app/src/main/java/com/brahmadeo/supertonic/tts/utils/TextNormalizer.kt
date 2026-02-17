@@ -276,7 +276,11 @@ class TextNormalizer {
         return normalized
     }
 
-    fun splitIntoSentences(text: String): List<String> {
+    fun splitIntoSentences(text: String, lang: String = "en"): List<String> {
+        val l = lang.lowercase()
+        val isEnglish = l.startsWith("en")
+        val isRomance = l.startsWith("es") || l.startsWith("fr") || l.startsWith("pt")
+
         val abbreviations = listOf(
             "Mr.", "Mrs.", "Dr.", "Ms.", "Prof.", "Sr.", "Jr.", 
             "etc.", "vs.", "e.g.", "i.e.",
@@ -295,11 +299,8 @@ class TextNormalizer {
         // Split by:
         // 1. Punctuation (.!?) followed by optional quote and space and Capital/Number/Unicode Letter
         // 2. Semi-colon followed by space
-        // FIXED: Quotes are now INSIDE the lookbehind so they aren't consumed by split
-        // OLD: (?<=[.!?])['"”’]?\\s+
-        // NEW: (?<=[.!?]['"”’]?)\\s+
-        // We also use a more specific lookahead to detect start of next sentence
-        val pattern = Pattern.compile("(?<=[.!?]['\"”’]?)\\s+(?=['\"“‘]?[\\p{L}\\d])|(?<=[;])\\s+")
+        // ADDED: Romance punctuation support (¿, ¡)
+        val pattern = Pattern.compile("(?<=[.!?¿¡]['\"”’]?)\\s+(?=['\"“‘]?[\\p{L}\\d])|(?<=[;])\\s+")
         val rawSentences = protectedText.split(pattern)
         
         val refinedSentences = mutableListOf<String>()
@@ -354,10 +355,12 @@ class TextNormalizer {
         while (i < processedSentences.size) {
             var sentence = processedSentences[i]
             
-            // Universal Volatile/Punctuation Fix:
+            // Volatile/Punctuation Fix:
             // Always insert space before !, ?, ,, ; to stabilize audio
-            // Matches punctuation followed by optional quote/whitespace at end
-            sentence = sentence.replaceFirst(Regex("([!?,;])(['\"”’]?)\\s*$"), " $1$2")
+            // Restricted to English/Romance to avoid mangling other scripts
+            if (isEnglish || isRomance) {
+                sentence = sentence.replaceFirst(Regex("([!?,;¿¡])(['\"”’]?)\\s*$"), " $1$2")
+            }
 
             // HANDLE STABLE SENTENCE (Standard Accumulation)
             if (currentChunk.length + sentence.length + 1 <= CHUNK_LIMIT) {
@@ -379,6 +382,13 @@ class TextNormalizer {
             }
             i++
         }
+
+        if (currentChunk.isNotEmpty()) {
+            chunkedSentences.add(currentChunk.toString())
+        }
+
+        return chunkedSentences
+    }
 
         if (currentChunk.isNotEmpty()) {
             chunkedSentences.add(currentChunk.toString())

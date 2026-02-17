@@ -209,7 +209,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
             }
 
             synthesisJob = launch(Dispatchers.IO) {
-                val sentences = textNormalizer.splitIntoSentences(text)
+                val sentences = textNormalizer.splitIntoSentences(text, lang)
                 val totalSentences = sentences.size
                 
                 // Fix: If resume index is at the end, restart from beginning

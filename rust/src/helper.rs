@@ -117,84 +117,89 @@ pub fn preprocess_text(text: &str, lang: &str) -> Result<String> {
     // Revert to NFKD normalization as required for Korean Jamo decomposition
     let mut text: String = text.nfkd().collect();
 
-    if lang == "en" {
-        // Remove emojis (wide Unicode range)
-    let emoji_pattern = Regex::new(r"[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{1F700}-\x{1F77F}\x{1F780}-\x{1F7FF}\x{1F800}-\x{1F8FF}\x{1F900}-\x{1F9FF}\x{1FA00}-\x{1FA6F}\x{1FA70}-\x{1FAFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\x{1F1E6}-\x{1F1FF}]+").unwrap();
-    text = emoji_pattern.replace_all(&text, "").to_string();
-
-    // Replace various dashes and symbols
-    let replacements = [
-        ("–", "-"),      // en dash
-        ("‑", "-"),      // non-breaking hyphen
-        ("—", ", "),     // em dash -> comma (Natural pause)
-        ("_", " "),      // underscore
+    // Universal replacements for all languages
+    let universal_replacements = [
         ("\u{201C}", "\""),     // left double quote
         ("\u{201D}", "\""),     // right double quote
         ("\u{2018}", "'"),      // left single quote
         ("\u{2019}", "'"),      // right single quote
         ("´", "'"),      // acute accent
         ("`", "'"),      // grave accent
-        ("[", " "),      // left bracket
-        ("]", " "),      // right bracket
-        ("|", " "),      // vertical bar
-        ("/", " "),      // slash
-        ("#", " "),      // hash
-        ("→", " "),      // right arrow
-        ("←", " "),      // left arrow
+        ("–", "-"),      // en dash
+        ("‑", "-"),      // non-breaking hyphen
     ];
 
-    for (from, to) in &replacements {
+    for (from, to) in &universal_replacements {
         text = text.replace(from, to);
     }
 
-    // Remove special symbols
-    let special_symbols = ["♥", "☆", "♡", "©", "\\"];
-    for symbol in &special_symbols {
-        text = text.replace(symbol, "");
-    }
+    // Fix spacing around apostrophes for ALL languages
+    // This prevents "Ram's" being read as "Ram space s"
+    text = Regex::new(r"\s+(['])\s*").unwrap().replace_all(&text, "$1").to_string();
 
-    // Replace known expressions
-    let expr_replacements = [
-        ("@", " at "),
-        ("e.g.,", "for example, "),
-        ("i.e.,", "that is, "),
-    ];
+    if lang == "en" || lang == "es" || lang == "fr" || lang == "pt" {
+        // Remove emojis (wide Unicode range)
+        let emoji_pattern = Regex::new(r"[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{1F700}-\x{1F77F}\x{1F780}-\x{1F7FF}\x{1F800}-\x{1F8FF}\x{1F900}-\x{1F9FF}\x{1FA00}-\x{1FA6F}\x{1FA70}-\x{1FAFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\x{1F1E6}-\x{1F1FF}]+").unwrap();
+        text = emoji_pattern.replace_all(&text, "").to_string();
 
-    for (from, to) in &expr_replacements {
-        text = text.replace(from, to);
-    }
+        // Dash and symbol replacements for Romance/English
+        let replacements = [
+            ("—", ", "),     // em dash -> comma (Natural pause)
+            ("_", " "),      // underscore
+            ("[", " "),      // left bracket
+            ("]", " "),      // right bracket
+            ("|", " "),      // vertical bar
+            ("/", " "),      // slash
+            ("#", " "),      // hash
+            ("→", " "),      // right arrow
+            ("←", " "),      // left arrow
+        ];
 
-    // Fix spacing around punctuation
-    text = Regex::new(r" , ").unwrap().replace_all(&text, ",").to_string();
-    text = Regex::new(r" \. ").unwrap().replace_all(&text, ".").to_string();
-    text = Regex::new(r" ! ").unwrap().replace_all(&text, "!").to_string();
-    text = Regex::new(r" \? ").unwrap().replace_all(&text, "?").to_string();
-    text = Regex::new(r" ; ").unwrap().replace_all(&text, ";").to_string();
-    text = Regex::new(r" : ").unwrap().replace_all(&text, ":").to_string();
-    text = Regex::new(r" ' ").unwrap().replace_all(&text, "'").to_string();
-
-    // Remove duplicate quotes
-    while text.contains("\"\"") {
-        text = text.replace("\"\"", "\"");
-    }
-    while text.contains("''") {
-        text = text.replace("''", "'");
-    }
-    while text.contains("``") {
-        text = text.replace("``", "`");
-    }
-
-    // Remove extra spaces
-    text = Regex::new(r"\s+").unwrap().replace_all(&text, " ").to_string();
-    text = text.trim().to_string();
-
-    // If text doesn't end with punctuation, quotes, or closing brackets, add a period
-    if !text.is_empty() {
-        let ends_with_punct = Regex::new(r#"[.!?;:,'"\u{201C}\u{201D}\u{2018}\u{2019})\\]}}…。」』】〉》›»]$"#).unwrap();
-        if !ends_with_punct.is_match(&text) {
-            text.push('.');
+        for (from, to) in &replacements {
+            text = text.replace(from, to);
         }
-    }
+
+        // Remove special symbols
+        let special_symbols = ["♥", "☆", "♡", "©", "\\"];
+        for symbol in &special_symbols {
+            text = text.replace(symbol, "");
+        }
+
+        if lang == "en" {
+            // Replace known expressions
+            let expr_replacements = [
+                ("@", " at "),
+                ("e.g.,", "for example, "),
+                ("i.e.,", "that is, "),
+            ];
+
+            for (from, to) in &expr_replacements {
+                text = text.replace(from, to);
+            }
+        }
+
+        // Fix spacing around punctuation (Romance/English)
+        text = Regex::new(r"\s+([,.!?;:])").unwrap().replace_all(&text, "$1").to_string();
+        
+        // Remove duplicate quotes
+        while text.contains("\"\"") {
+            text = text.replace("\"\"", "\"");
+        }
+        while text.contains("''") {
+            text = text.replace("''", "'");
+        }
+
+        // Remove extra spaces
+        text = Regex::new(r"\s+").unwrap().replace_all(&text, " ").to_string();
+        text = text.trim().to_string();
+
+        // If text doesn't end with punctuation, quotes, or closing brackets, add a period
+        if !text.is_empty() {
+            let ends_with_punct = Regex::new(r#"[.!?;:¿¡,'"\u{201C}\u{201D}\u{2018}\u{2019})\\]}}…。」』】〉》›»]$"#).unwrap();
+            if !ends_with_punct.is_match(&text) {
+                text.push('.');
+            }
+        }
     }
 
     // Validate language

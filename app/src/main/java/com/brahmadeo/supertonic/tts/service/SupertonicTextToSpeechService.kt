@@ -230,8 +230,8 @@ class SupertonicTextToSpeechService : TextToSpeechService() {
         }
         
         try {
-            val sentences = textNormalizer.splitIntoSentences(rawText)
             val requestLang = normalizeLanguage(request.language)
+            val sentences = textNormalizer.splitIntoSentences(rawText, requestLang)
             var success = true
             for (sentence in sentences) {
                 if (SupertonicTTS.isCancelled()) { success = false; break }
