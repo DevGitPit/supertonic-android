@@ -39,7 +39,34 @@ Builds:
       - rust/vendor/regex-automata-0.4.13/tests/fuzz/testdata/
     ndk: r26b
 
+  - versionName: 2.0.0-beta.1
+    versionCode: 5
+    commit: v2.0.0-beta.1
+    sudo:
+      - apt-get update
+      - apt-get install -y build-essential pkg-config libssl-dev
+    gradle:
+      - yes
+    output: app/build/outputs/apk/release/app-release-unsigned.apk
+    prebuild:
+      - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup-init.sh
+      - sh rustup-init.sh -y --default-toolchain stable
+      - source $HOME/.cargo/env
+      - rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android
+        x86_64-linux-android
+      - mkdir -p rust/.cargo
+      - echo '[target.aarch64-linux-android]' > rust/.cargo/config.toml
+      - echo 'linker = "aarch64-linux-android34-clang"' >> rust/.cargo/config.toml
+      - echo '[source.crates-io]' >> rust/.cargo/config.toml
+      - echo 'replace-with = "vendored-sources"' >> rust/.cargo/config.toml
+      - echo '[source.vendored-sources]' >> rust/.cargo/config.toml
+      - echo 'directory = "vendor"' >> rust/.cargo/config.toml
+    scanignore:
+      - rust/vendor/wit-bindgen-0.51.0/wasi-cli@0.2.0.wasm
+      - rust/vendor/regex-automata-0.4.13/tests/fuzz/testdata/
+    ndk: r26b
+
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: '1.3'
-CurrentVersionCode: 4
+CurrentVersion: 2.0.0-beta.1
+CurrentVersionCode: 5
