@@ -208,20 +208,22 @@ class TextNormalizer {
     }
 
     fun normalize(text: String, lang: String = "en"): String {
-        // EARLY EXIT for non-English
-        // We skip Lexicon and all normalization for non-English languages for now
-        // to prevent English-specific rules from mangling other scripts (e.g. Korean).
-        if (!lang.lowercase().startsWith("en")) {
+        val l = lang.lowercase()
+        val isEnglish = l.startsWith("en")
+        val isRomance = l.startsWith("es") || l.startsWith("fr") || l.startsWith("pt")
+
+        // EARLY EXIT for languages we don't normalize at all (like Korean)
+        if (!isEnglish && !isRomance) {
             return text
         }
 
-        // Step -1: Apply User Lexicon
-        val lexText = LexiconManager.apply(text)
+        // Step -1: Apply User Lexicon (English only for now)
+        var fixedText = if (isEnglish) LexiconManager.apply(text) else text
 
-        // Step 0: Fix smushed text from webpage layouts
+        // Step 0: Fix smushed text from webpage layouts (Universal for English/Romance)
         // Fix smushed sentences: lowercase char, period, uppercase char (reserved.Reuse)
         val smushedSentencePattern = Pattern.compile("([a-z])\\.([A-Z])")
-        var fixedText = smushedSentencePattern.matcher(lexText).replaceAll("$1. $2")
+        fixedText = smushedSentencePattern.matcher(fixedText).replaceAll("$1. $2")
         
         // Fix smushed words: lowercase char, uppercase char (economyIMF)
         val smushedWordPattern1 = Pattern.compile("([a-z])([A-Z])")
@@ -235,45 +237,47 @@ class TextNormalizer {
         val letterNumberPattern = Pattern.compile("([a-zA-Z])(\\d)")
         fixedText = letterNumberPattern.matcher(fixedText).replaceAll("$1 $2")
 
-        // Step 1: Currency
-        var normalized = currencyNormalizer.normalize(fixedText)
-        
-        // Step 2: Other rules
-        for (rule in rules) {
-            val matcher = rule.pattern.matcher(normalized)
+        // Fix spacing around apostrophes (Universal for English/Romance) - prevents "Ram ' s"
+        fixedText = fixedText.replace(Regex("\\s*['’]\\s*"), "'")
+
+        if (isEnglish) {
+            // Step 1: Currency (English specific)
+            var normalized = currencyNormalizer.normalize(fixedText)
+            
+            // Step 2: Other rules (English specific)
+            for (rule in rules) {
+                val matcher = rule.pattern.matcher(normalized)
+                val sb = StringBuffer()
+                while (matcher.find()) {
+                    val replacement = rule.replacement(matcher).replace("\\", "\\\\").replace("$", "\\$")
+                    matcher.appendReplacement(sb, replacement)
+                }
+                matcher.appendTail(sb)
+                normalized = sb.toString()
+            }
+
+            // Step 3: Convert remaining numbers to words (English specific)
+            val numberPattern = Pattern.compile("\\b(\\d+(?:\\.\\d+)?)\\b")
+            val matcher = numberPattern.matcher(normalized)
             val sb = StringBuffer()
             while (matcher.find()) {
-                val replacement = rule.replacement(matcher).replace("\\", "\\\\").replace("$", "\\$")
-                matcher.appendReplacement(sb, replacement)
+                val numStr = matcher.group(1) ?: ""
+                try {
+                    val replacement = if (numStr.contains(".")) {
+                        NumberUtils.convertDouble(numStr.toDouble())
+                    } else {
+                        NumberUtils.convert(numStr.toLong())
+                    }
+                    matcher.appendReplacement(sb, replacement)
+                } catch (e: Exception) {
+                    matcher.appendReplacement(sb, numStr)
+                }
             }
             matcher.appendTail(sb)
-            normalized = sb.toString()
+            fixedText = sb.toString()
         }
 
-        // Step 3: Convert remaining numbers to words (CRITICAL for C++ Engine)
-        // Matches integers and decimals (e.g. "300000" -> "three hundred thousand")
-        val numberPattern = Pattern.compile("\\b(\\d+(?:\\.\\d+)?)\\b")
-        val matcher = numberPattern.matcher(normalized)
-        val sb = StringBuffer()
-        while (matcher.find()) {
-            val numStr = matcher.group(1) ?: ""
-            try {
-                val replacement = if (numStr.contains(".")) {
-                    NumberUtils.convertDouble(numStr.toDouble())
-                } else {
-                    NumberUtils.convert(numStr.toLong())
-                }
-                matcher.appendReplacement(sb, replacement)
-            } catch (e: Exception) {
-                // If number is too large for Long, keep it as digits (or implement BigInt logic if needed)
-                // For TTS, massive numbers usually read digit-by-digit anyway
-                matcher.appendReplacement(sb, numStr)
-            }
-        }
-        matcher.appendTail(sb)
-        normalized = sb.toString()
-
-        return normalized
+        return fixedText
     }
 
     fun splitIntoSentences(text: String, lang: String = "en"): List<String> {
@@ -382,13 +386,6 @@ class TextNormalizer {
             }
             i++
         }
-
-        if (currentChunk.isNotEmpty()) {
-            chunkedSentences.add(currentChunk.toString())
-        }
-
-        return chunkedSentences
-    }
 
         if (currentChunk.isNotEmpty()) {
             chunkedSentences.add(currentChunk.toString())
