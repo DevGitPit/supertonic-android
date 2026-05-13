@@ -1,6 +1,6 @@
 ## Get Supertonic for Android
 
-(Supertonic)[https://github.com/supertone-inc/supertonic] is a Text-to-Speech (TTS) engine available across multiple platforms. Please note that functionality and bug fixes may vary slightly between the F-Droid and Play Store builds.
+[Supertonic](https://github.com/supertone-inc/supertonic) is a Text-to-Speech (TTS) engine available across multiple platforms. Please note that functionality and bug fixes may vary slightly between the F-Droid and Play Store builds. Supertonic 1 and Supertonic 2 are supported. 
 
 ### Download Options
 
