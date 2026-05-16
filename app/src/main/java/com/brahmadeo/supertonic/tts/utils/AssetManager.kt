@@ -73,6 +73,27 @@ object AssetManager {
         downloadVersion(context, "v3", BASE_URL_V3, V3_FILES, onProgress)
     }
 
+    private fun probeFileSize(urlString: String): Long {
+        val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            instanceFollowRedirects = true
+            setRequestProperty("Range", "bytes=0-0")
+        }
+        try {
+            conn.connect()
+            // Content-Range: bytes 0-0/TOTAL  (206 Partial Content)
+            val contentRange = conn.getHeaderField("Content-Range")
+            if (contentRange != null) {
+                val total = contentRange.substringAfterLast('/').trim().toLongOrNull()
+                if (total != null && total > 0) return total
+            }
+            // Fallback: full Content-Length if server ignores Range
+            return conn.contentLengthLong.takeIf { it > 0 } ?: 0L
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     fun deleteVersion(context: Context, version: String) {
         val baseDir = File(context.filesDir, version)
         if (baseDir.exists()) {
@@ -91,22 +112,32 @@ object AssetManager {
             val baseDir = File(context.filesDir, version)
             if (!baseDir.exists()) baseDir.mkdirs()
 
-            var cumulativeBytesDownloaded = 0L
-            var cumulativeTotalBytes = 0L
-
-            files.forEachIndexed { index, relativePath ->
+            // Pre-pass: compute stable total before any downloading begins
+            var totalBytes = 0L
+            files.forEach { relativePath ->
                 val targetFile = File(baseDir, relativePath)
                 if (targetFile.exists()) {
-                    val fileSize = targetFile.length()
-                    cumulativeTotalBytes += fileSize
-                    cumulativeBytesDownloaded += fileSize
+                    totalBytes += targetFile.length()
+                } else {
+                    val len = probeFileSize("$baseUrl/$relativePath")
+                    if (len > 0) totalBytes += len
+                }
+            }
+            Log.d(TAG, "Pre-computed total size: $totalBytes bytes")
+
+            var cumulativeBytesDownloaded = 0L
+
+            files.forEach { relativePath ->
+                val targetFile = File(baseDir, relativePath)
+                if (targetFile.exists()) {
+                    cumulativeBytesDownloaded += targetFile.length()
                     onProgress(
                         "Checking ${targetFile.name}",
-                        (index.toFloat() / files.size),
+                        (cumulativeBytesDownloaded.toFloat() / totalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
                         cumulativeBytesDownloaded,
-                        cumulativeTotalBytes
+                        totalBytes
                     )
-                    return@forEachIndexed
+                    return@forEach
                 }
 
                 targetFile.parentFile?.let { if (!it.exists()) it.mkdirs() }
@@ -119,16 +150,13 @@ object AssetManager {
                     }
 
                     try {
-                        val input = connection.inputStream  // follows redirects here
-                        val contentLength = connection.contentLengthLong.takeIf { it > 0 } ?: 0L
-                        cumulativeTotalBytes += contentLength
-
-                        Log.d(TAG, "Downloading $url to ${targetFile.absolutePath} ($contentLength bytes)")
+                        val input = connection.inputStream
+                        Log.d(TAG, "Downloading $url to ${targetFile.absolutePath}")
                         onProgress(
                             "Downloading $fileName",
-                            (cumulativeBytesDownloaded.toFloat() / cumulativeTotalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
+                            (cumulativeBytesDownloaded.toFloat() / totalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
                             cumulativeBytesDownloaded,
-                            cumulativeTotalBytes
+                            totalBytes
                         )
 
                         input.use { stream ->
@@ -140,9 +168,9 @@ object AssetManager {
                                     cumulativeBytesDownloaded += bytesRead
                                     onProgress(
                                         "Downloading $fileName",
-                                        (cumulativeBytesDownloaded.toFloat() / cumulativeTotalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
+                                        (cumulativeBytesDownloaded.toFloat() / totalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
                                         cumulativeBytesDownloaded,
-                                        cumulativeTotalBytes
+                                        totalBytes
                                     )
                                 }
                             }
@@ -156,7 +184,7 @@ object AssetManager {
                     throw e
                 }
             }
-            onProgress("Ready", 1.0f, cumulativeBytesDownloaded, cumulativeTotalBytes)
+            onProgress("Ready", 1.0f, cumulativeBytesDownloaded, totalBytes)
         }
     }
 }
