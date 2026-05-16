@@ -6,6 +6,8 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import android.content.Context
+import com.brahmadeo.supertonic.tts.utils.AssetManager
 
 class MainViewModel : ViewModel() {
     // UI State
@@ -46,6 +48,17 @@ class MainViewModel : ViewModel() {
     var showV3ConfirmDialog = mutableStateOf(false)
     var showV3DeleteDialog = mutableStateOf(false)
     var pendingLangCode = ""
+
+    // Asset readiness (cached, recomputed via refreshReadiness so Compose doesn't stat files on every recomposition)
+    var isV1Ready = mutableStateOf(false)
+    var isV2Ready = mutableStateOf(false)
+    var isV3Ready = mutableStateOf(false)
+
+    fun refreshReadiness(context: Context) {
+        isV1Ready.value = AssetManager.isV1Ready(context)
+        isV2Ready.value = AssetManager.isV2Ready(context)
+        isV3Ready.value = AssetManager.isV3Ready(context)
+    }
 
     // Data
     val voiceFiles = mutableStateMapOf<String, String>()
