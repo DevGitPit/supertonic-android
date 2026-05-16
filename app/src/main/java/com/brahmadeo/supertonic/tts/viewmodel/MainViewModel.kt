@@ -40,6 +40,8 @@ class MainViewModel : ViewModel() {
     var queueDialogText = ""
     var showV2ConfirmDialog = mutableStateOf(false)
     var showV2DeleteDialog = mutableStateOf(false)
+    var showV3ConfirmDialog = mutableStateOf(false)
+    var showV3DeleteDialog = mutableStateOf(false)
     var pendingLangCode = ""
 
     // Data

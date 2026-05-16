@@ -16,10 +16,10 @@ fun DownloadScreen(
     error: String? = null,
     onRetry: () -> Unit = {}
 ) {
-    val message = if (version == "v2") {
-        "Downloading Multilingual Models (~350MB). This enables support for French, Spanish, Portuguese, and Korean. This specific download happens only once."
-    } else {
-        "Downloading Standard English Models (~350MB). This is a one-time setup for English synthesis."
+    val message = when (version) {
+        "v2" -> "Downloading Multilingual Models (~255MB). This enables support for French, Spanish, Portuguese, and Korean. This specific download happens only once."
+        "v3" -> "Downloading Supertonic-3 Models (~385MB). This enables support for 31 languages with higher quality and expression tags. This specific download happens only once."
+        else -> "Downloading Standard English Models (~255MB). This is a one-time setup for English synthesis."
     }
 
     Surface(
