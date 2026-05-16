@@ -11,10 +11,10 @@ import java.net.URL
 
 object AssetManager {
     private const val TAG = "AssetManager"
-    private const val BASE_URL_V1 = "https://huggingface.co/Supertone/supertonic/resolve/main"
-    private const val BASE_URL_V2 = "https://huggingface.co/Supertone/supertonic-2/resolve/main"
-    private const val BASE_URL_V3 = "https://huggingface.co/Supertone/supertonic-3/resolve/main"
-    
+    private const val CONNECT_TIMEOUT_MS = 15_000
+    private const val READ_TIMEOUT_MS = 60_000
+    private const val MAX_RETRIES = 3
+    private const val BUFFER_SIZE = 65_536
     private val V1_FILES = listOf(
         "onnx/duration_predictor.onnx",
         "onnx/text_encoder.onnx",
@@ -51,47 +51,114 @@ object AssetManager {
         "voice_styles/F1.json", "voice_styles/F2.json", "voice_styles/F3.json", "voice_styles/F4.json", "voice_styles/F5.json"
     )
 
-    fun isV1Ready(context: Context): Boolean = checkReady(context, "v1", V1_FILES)
-    fun isV2Ready(context: Context): Boolean = checkReady(context, "v2", V2_FILES)
-    fun isV3Ready(context: Context): Boolean = checkReady(context, "v3", V3_FILES)
+    private fun filesFor(version: ModelVersion): List<String> = when (version) {
+        ModelVersion.V1 -> V1_FILES
+        ModelVersion.V2 -> V2_FILES
+        ModelVersion.V3 -> V3_FILES
+    }
 
-    private fun checkReady(context: Context, version: String, files: List<String>): Boolean {
-        val baseDir = File(context.filesDir, version)
+    fun isReady(context: Context, version: ModelVersion): Boolean {
+        val baseDir = File(context.filesDir, version.dirName)
         if (!baseDir.exists()) return false
-        return files.all { File(baseDir, it).exists() }
+        return filesFor(version).all { File(baseDir, it).exists() }
     }
 
-    suspend fun downloadV1(context: Context, onProgress: (String, Float, Long, Long) -> Unit) {
-        downloadVersion(context, "v1", BASE_URL_V1, V1_FILES, onProgress)
-    }
+    fun isV1Ready(context: Context): Boolean = isReady(context, ModelVersion.V1)
+    fun isV2Ready(context: Context): Boolean = isReady(context, ModelVersion.V2)
+    fun isV3Ready(context: Context): Boolean = isReady(context, ModelVersion.V3)
 
-    suspend fun downloadV2(context: Context, onProgress: (String, Float, Long, Long) -> Unit) {
-        downloadVersion(context, "v2", BASE_URL_V2, V2_FILES, onProgress)
-    }
-
-    suspend fun downloadV3(context: Context, onProgress: (String, Float, Long, Long) -> Unit) {
-        downloadVersion(context, "v3", BASE_URL_V3, V3_FILES, onProgress)
+    suspend fun download(context: Context, version: ModelVersion, onProgress: (String, Float, Long, Long) -> Unit) {
+        downloadVersion(context, version.dirName, version.baseUrl, filesFor(version), onProgress)
     }
 
     private fun probeFileSize(urlString: String): Long {
-        val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            instanceFollowRedirects = true
-            setRequestProperty("Range", "bytes=0-0")
-        }
-        try {
-            conn.connect()
-            // Content-Range: bytes 0-0/TOTAL  (206 Partial Content)
-            val contentRange = conn.getHeaderField("Content-Range")
-            if (contentRange != null) {
-                val total = contentRange.substringAfterLast('/').trim().toLongOrNull()
-                if (total != null && total > 0) return total
+        var lastException: Exception? = null
+        repeat(MAX_RETRIES) { attempt ->
+            val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                instanceFollowRedirects = true
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+                setRequestProperty("Range", "bytes=0-0")
             }
-            // Fallback: full Content-Length if server ignores Range
-            return conn.contentLengthLong.takeIf { it > 0 } ?: 0L
-        } finally {
-            conn.disconnect()
+            try {
+                conn.connect()
+                val responseCode = conn.responseCode
+                if (responseCode == 429) {
+                    val retryAfter = conn.getHeaderField("Retry-After")?.toLongOrNull() ?: 60L
+                    Log.w(TAG, "Rate limited probing $urlString, waiting ${retryAfter}s")
+                    Thread.sleep(retryAfter * 1_000)
+                    lastException = Exception("HTTP 429 for $urlString")
+                    return@repeat
+                }
+                val contentRange = conn.getHeaderField("Content-Range")
+                if (contentRange != null) {
+                    val total = contentRange.substringAfterLast('/').trim().toLongOrNull()
+                    if (total != null && total > 0) return total
+                }
+                return conn.contentLengthLong.takeIf { it > 0 } ?: 0L
+            } catch (e: Exception) {
+                lastException = e
+                Log.w(TAG, "Probe attempt ${attempt + 1}/$MAX_RETRIES failed for $urlString: ${e.message}")
+                if (attempt < MAX_RETRIES - 1) Thread.sleep(1_000L * (attempt + 1))
+            } finally {
+                conn.disconnect()
+            }
         }
+        throw lastException ?: Exception("Probe failed after $MAX_RETRIES attempts")
+    }
+
+    private fun downloadFileWithResume(
+        url: String,
+        targetFile: File,
+        onChunk: (bytesWritten: Long) -> Unit
+    ) {
+        val partFile = File(targetFile.parent, "${targetFile.name}.part")
+        val resumeOffset = if (partFile.exists()) partFile.length() else 0L
+
+        var lastException: Exception? = null
+        repeat(MAX_RETRIES) { attempt ->
+            try {
+                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    instanceFollowRedirects = true
+                    connectTimeout = CONNECT_TIMEOUT_MS
+                    readTimeout = READ_TIMEOUT_MS
+                    if (resumeOffset > 0) setRequestProperty("Range", "bytes=$resumeOffset-")
+                }
+                try {
+                    val responseCode = conn.responseCode
+                    if (responseCode == 429) {
+                        val retryAfter = conn.getHeaderField("Retry-After")?.toLongOrNull() ?: 60L
+                        Log.w(TAG, "Rate limited downloading $url, waiting ${retryAfter}s")
+                        Thread.sleep(retryAfter * 1_000)
+                        throw Exception("HTTP 429 for $url")
+                    }
+                    val appending = responseCode == HttpURLConnection.HTTP_PARTIAL
+                    if (responseCode != HttpURLConnection.HTTP_OK && !appending) {
+                        throw Exception("HTTP $responseCode for $url")
+                    }
+                    conn.inputStream.use { input ->
+                        FileOutputStream(partFile, appending).use { output ->
+                            val buffer = ByteArray(BUFFER_SIZE)
+                            var bytesRead: Int
+                            while (input.read(buffer).also { bytesRead = it } != -1) {
+                                output.write(buffer, 0, bytesRead)
+                                onChunk(bytesRead.toLong())
+                            }
+                        }
+                    }
+                } finally {
+                    conn.disconnect()
+                }
+                partFile.renameTo(targetFile)
+                return
+            } catch (e: Exception) {
+                lastException = e
+                Log.w(TAG, "Attempt ${attempt + 1}/$MAX_RETRIES failed for $url: ${e.message}")
+                if (attempt < MAX_RETRIES - 1) Thread.sleep(1_000L * (attempt + 1))
+            }
+        }
+        throw lastException ?: Exception("Download failed after $MAX_RETRIES attempts")
     }
 
     fun deleteVersion(context: Context, version: String) {
@@ -100,6 +167,8 @@ object AssetManager {
             baseDir.deleteRecursively()
         }
     }
+
+    fun deleteVersion(context: Context, version: ModelVersion) = deleteVersion(context, version.dirName)
 
     private suspend fun downloadVersion(
         context: Context,
@@ -143,45 +212,23 @@ object AssetManager {
                 targetFile.parentFile?.let { if (!it.exists()) it.mkdirs() }
 
                 val url = "$baseUrl/$relativePath"
-                try {
-                    val fileName = targetFile.name
-                    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                        instanceFollowRedirects = true
-                    }
+                val fileName = targetFile.name
+                Log.d(TAG, "Downloading $url to ${targetFile.absolutePath}")
+                onProgress(
+                    "Downloading $fileName",
+                    (cumulativeBytesDownloaded.toFloat() / totalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
+                    cumulativeBytesDownloaded,
+                    totalBytes
+                )
 
-                    try {
-                        val input = connection.inputStream
-                        Log.d(TAG, "Downloading $url to ${targetFile.absolutePath}")
-                        onProgress(
-                            "Downloading $fileName",
-                            (cumulativeBytesDownloaded.toFloat() / totalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
-                            cumulativeBytesDownloaded,
-                            totalBytes
-                        )
-
-                        input.use { stream ->
-                            FileOutputStream(targetFile).use { output ->
-                                val buffer = ByteArray(8192)
-                                var bytesRead: Int
-                                while (stream.read(buffer).also { bytesRead = it } != -1) {
-                                    output.write(buffer, 0, bytesRead)
-                                    cumulativeBytesDownloaded += bytesRead
-                                    onProgress(
-                                        "Downloading $fileName",
-                                        (cumulativeBytesDownloaded.toFloat() / totalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
-                                        cumulativeBytesDownloaded,
-                                        totalBytes
-                                    )
-                                }
-                            }
-                        }
-                    } finally {
-                        connection.disconnect()
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to download $relativePath", e)
-                    targetFile.delete()
-                    throw e
+                downloadFileWithResume(url, targetFile) { chunkBytes ->
+                    cumulativeBytesDownloaded += chunkBytes
+                    onProgress(
+                        "Downloading $fileName",
+                        (cumulativeBytesDownloaded.toFloat() / totalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
+                        cumulativeBytesDownloaded,
+                        totalBytes
+                    )
                 }
             }
             onProgress("Ready", 1.0f, cumulativeBytesDownloaded, totalBytes)
