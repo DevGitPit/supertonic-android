@@ -13,6 +13,8 @@ fun DownloadScreen(
     status: String,
     progress: Float,
     version: String,
+    downloadedBytes: Long = 0L,
+    totalBytes: Long = 0L,
     error: String? = null,
     onRetry: () -> Unit = {}
 ) {
@@ -58,6 +60,23 @@ fun DownloadScreen(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                val mbText = if (totalBytes > 0) {
+                    val downloaded = downloadedBytes / (1024.0 * 1024.0)
+                    val total = totalBytes / (1024.0 * 1024.0)
+                    "%.1f / %.1f MB".format(downloaded, total)
+                } else if (downloadedBytes > 0) {
+                    "%.1f MB".format(downloadedBytes / (1024.0 * 1024.0))
+                } else {
+                    ""
+                }
+                if (mbText.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = mbText,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             } else {
                 Spacer(modifier = Modifier.height(32.dp))
                 Button(

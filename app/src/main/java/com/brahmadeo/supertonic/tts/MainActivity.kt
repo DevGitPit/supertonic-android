@@ -241,6 +241,8 @@ class MainActivity : ComponentActivity() {
                         status = viewModel.downloadStatus.value,
                         progress = viewModel.downloadProgress.floatValue,
                         version = viewModel.downloadingVersion.value,
+                        downloadedBytes = viewModel.downloadedBytes.longValue,
+                        totalBytes = viewModel.totalBytes.longValue,
                         error = viewModel.downloadError.value,
                         onRetry = { startDownload(viewModel.downloadingVersion.value) }
                     )
@@ -593,12 +595,16 @@ class MainActivity : ComponentActivity() {
         viewModel.isDownloading.value = true
         viewModel.downloadingVersion.value = version
         viewModel.downloadError.value = null
+        viewModel.downloadedBytes.longValue = 0L
+        viewModel.totalBytes.longValue = 0L
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val progressCallback: (String, Float) -> Unit = { status, progress ->
+                val progressCallback: (String, Float, Long, Long) -> Unit = { status, progress, bytesDownloaded, totalBytes ->
                     runOnUiThread {
                         viewModel.downloadStatus.value = status
                         viewModel.downloadProgress.floatValue = progress
+                        viewModel.downloadedBytes.longValue = bytesDownloaded
+                        viewModel.totalBytes.longValue = totalBytes
                     }
                 }
                 when (version) {

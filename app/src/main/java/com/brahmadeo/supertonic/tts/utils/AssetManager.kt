@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.net.HttpURLConnection
 import java.net.URL
 
 object AssetManager {
@@ -60,15 +61,15 @@ object AssetManager {
         return files.all { File(baseDir, it).exists() }
     }
 
-    suspend fun downloadV1(context: Context, onProgress: (String, Float) -> Unit) {
+    suspend fun downloadV1(context: Context, onProgress: (String, Float, Long, Long) -> Unit) {
         downloadVersion(context, "v1", BASE_URL_V1, V1_FILES, onProgress)
     }
 
-    suspend fun downloadV2(context: Context, onProgress: (String, Float) -> Unit) {
+    suspend fun downloadV2(context: Context, onProgress: (String, Float, Long, Long) -> Unit) {
         downloadVersion(context, "v2", BASE_URL_V2, V2_FILES, onProgress)
     }
 
-    suspend fun downloadV3(context: Context, onProgress: (String, Float) -> Unit) {
+    suspend fun downloadV3(context: Context, onProgress: (String, Float, Long, Long) -> Unit) {
         downloadVersion(context, "v3", BASE_URL_V3, V3_FILES, onProgress)
     }
 
@@ -80,42 +81,74 @@ object AssetManager {
     }
 
     private suspend fun downloadVersion(
-        context: Context, 
-        version: String, 
-        baseUrl: String, 
-        files: List<String>, 
-        onProgress: (String, Float) -> Unit
+        context: Context,
+        version: String,
+        baseUrl: String,
+        files: List<String>,
+        onProgress: (String, Float, Long, Long) -> Unit
     ) {
         withContext(Dispatchers.IO) {
             val baseDir = File(context.filesDir, version)
             if (!baseDir.exists()) baseDir.mkdirs()
 
+            var cumulativeBytesDownloaded = 0L
+            var cumulativeTotalBytes = 0L
+
             files.forEachIndexed { index, relativePath ->
                 val targetFile = File(baseDir, relativePath)
                 if (targetFile.exists()) {
-                    onProgress("Checking $version/$relativePath...", (index.toFloat() / files.size))
+                    val fileSize = targetFile.length()
+                    cumulativeTotalBytes += fileSize
+                    cumulativeBytesDownloaded += fileSize
+                    onProgress(
+                        "Checking ${targetFile.name}",
+                        (index.toFloat() / files.size),
+                        cumulativeBytesDownloaded,
+                        cumulativeTotalBytes
+                    )
                     return@forEachIndexed
                 }
 
-                targetFile.parentFile?.let {
-                    if (!it.exists()) it.mkdirs()
-                }
-
-                // Hugging Face structure for V1 is "supertonic/onnx/..."
-                // But the file list assumes relative path matches URL path structure.
-                // V1 URL: .../supertonic/resolve/main/onnx/duration_predictor.onnx
-                // V2 URL: .../supertonic-2/resolve/main/onnx/duration_predictor.onnx
-                // This matches our structure.
+                targetFile.parentFile?.let { if (!it.exists()) it.mkdirs() }
 
                 val url = "$baseUrl/$relativePath"
                 try {
-                    onProgress("Downloading $version/$relativePath...", (index.toFloat() / files.size))
-                    Log.d(TAG, "Downloading $url to ${targetFile.absolutePath}")
-                    
-                    URL(url).openStream().use { input ->
-                        FileOutputStream(targetFile).use { output ->
-                            input.copyTo(output)
+                    val fileName = targetFile.name
+                    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                        instanceFollowRedirects = true
+                    }
+
+                    try {
+                        val input = connection.inputStream  // follows redirects here
+                        val contentLength = connection.contentLengthLong.takeIf { it > 0 } ?: 0L
+                        cumulativeTotalBytes += contentLength
+
+                        Log.d(TAG, "Downloading $url to ${targetFile.absolutePath} ($contentLength bytes)")
+                        onProgress(
+                            "Downloading $fileName",
+                            (cumulativeBytesDownloaded.toFloat() / cumulativeTotalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
+                            cumulativeBytesDownloaded,
+                            cumulativeTotalBytes
+                        )
+
+                        input.use { stream ->
+                            FileOutputStream(targetFile).use { output ->
+                                val buffer = ByteArray(8192)
+                                var bytesRead: Int
+                                while (stream.read(buffer).also { bytesRead = it } != -1) {
+                                    output.write(buffer, 0, bytesRead)
+                                    cumulativeBytesDownloaded += bytesRead
+                                    onProgress(
+                                        "Downloading $fileName",
+                                        (cumulativeBytesDownloaded.toFloat() / cumulativeTotalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
+                                        cumulativeBytesDownloaded,
+                                        cumulativeTotalBytes
+                                    )
+                                }
+                            }
                         }
+                    } finally {
+                        connection.disconnect()
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to download $relativePath", e)
@@ -123,7 +156,7 @@ object AssetManager {
                     throw e
                 }
             }
-            onProgress("Ready", 1.0f)
+            onProgress("Ready", 1.0f, cumulativeBytesDownloaded, cumulativeTotalBytes)
         }
     }
 }
