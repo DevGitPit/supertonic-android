@@ -25,6 +25,7 @@ import androidx.core.app.ServiceCompat
 import com.brahmadeo.supertonic.tts.R
 import com.brahmadeo.supertonic.tts.SupertonicTTS
 import com.brahmadeo.supertonic.tts.utils.AssetManager
+import com.brahmadeo.supertonic.tts.utils.ModelVersion
 import com.brahmadeo.supertonic.tts.utils.QueueItem
 import com.brahmadeo.supertonic.tts.utils.QueueManager
 import com.brahmadeo.supertonic.tts.utils.TextNormalizer
@@ -182,16 +183,16 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
 
         val savedLang = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).getString("selected_lang", "en") ?: "en"
         val modelVersion = resolveModelVersion(savedLang)
-        val modelPath = File(filesDir, "$modelVersion/onnx").absolutePath
+        val modelPath = File(filesDir, "${modelVersion.dirName}/onnx").absolutePath
         val libPath = applicationInfo.nativeLibraryDir + "/libonnxruntime.so"
         SupertonicTTS.initialize(modelPath, libPath)
     }
 
-    private fun resolveModelVersion(savedLang: String): String = when {
-        savedLang == "en" -> "v1"
-        AssetManager.isV3Ready(this) -> "v3"
-        else -> "v2"
-    }
+    private fun resolveModelVersion(savedLang: String): ModelVersion = ModelVersion.resolve(
+        savedLang = savedLang,
+        isV2Ready = AssetManager.isV2Ready(this),
+        isV3Ready = AssetManager.isV3Ready(this),
+    )
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == "STOP_PLAYBACK") {
@@ -199,8 +200,9 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         } else if (intent?.action == "RESET_ENGINE") {
             SupertonicTTS.release()
             val savedLang = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).getString("selected_lang", "en") ?: "en"
-            val modelVersion = intent.getStringExtra("model_version") ?: resolveModelVersion(savedLang)
-            val modelPath = File(filesDir, "$modelVersion/onnx").absolutePath
+            val modelVersion = intent.getStringExtra("model_version")?.let { ModelVersion.fromDirName(it) }
+                ?: resolveModelVersion(savedLang)
+            val modelPath = File(filesDir, "${modelVersion.dirName}/onnx").absolutePath
             val libPath = applicationInfo.nativeLibraryDir + "/libonnxruntime.so"
             SupertonicTTS.initialize(modelPath, libPath)
         }
