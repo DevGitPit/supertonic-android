@@ -36,6 +36,14 @@
     <string name="play_now">즉시 재생</string>
     <string name="added_to_queue">대기열에 추가됨</string>
 
+    <string name="v3_download_title">Supertonic-3 모델을 다운로드할까요?</string>
+    <string name="v3_download_message">Supertonic-3은 31개 언어를 높은 품질과 표현력으로 지원합니다. 추가 다운로드가 필요합니다(~385MB). 지금 다운로드하시겠습니까?</string>
+    <string name="v3_download_button">다운로드</string>
+    <string name="v3_delete_title">Supertonic-3 모델을 삭제할까요?</string>
+    <string name="v3_delete_message">이 작업은 공간 확보를 위해 Supertonic-3 모델을 제거합니다(~385MB). 필요한 경우 나중에 다시 다운로드할 수 있습니다.</string>
+    <string name="v3_deleted_msg">Supertonic-3 모델 삭제됨</string>
+    <string name="switched_to_model_fmt">모델 %1$s(으)로 전환됨</string>
+
     <!-- Playback Activity -->
     <string name="now_playing_title">현재 재생 중</string>
     <string name="saving_audio">오디오 저장 중…</string>
@@ -82,6 +90,7 @@
     <string name="action_history">기록</string>
     <string name="action_queue">대기열</string>
     <string name="action_lexicon">사전</string>
+    <string name="action_delete_v3">Supertonic-3 모델 삭제</string>
     <string name="action_import">JSON 가져오기</string>
     <string name="action_export">JSON 내보내기</string>
     
@@ -93,6 +102,32 @@
     <string name="lang_portuguese">포르투갈어</string>
     <string name="lang_spanish">스페인어</string>
     <string name="lang_korean">한국어</string>
+    <string name="lang_japanese">일본어</string>
+    <string name="lang_german">독일어</string>
+    <string name="lang_italian">이탈리아어</string>
+    <string name="lang_dutch">네덜란드어</string>
+    <string name="lang_polish">폴란드어</string>
+    <string name="lang_russian">러시아어</string>
+    <string name="lang_turkish">터키어</string>
+    <string name="lang_arabic">아랍어</string>
+    <string name="lang_hindi">힌디어</string>
+    <string name="lang_vietnamese">베트남어</string>
+    <string name="lang_indonesian">인도네시아어</string>
+    <string name="lang_czech">체코어</string>
+    <string name="lang_swedish">스웨덴어</string>
+    <string name="lang_danish">덴마크어</string>
+    <string name="lang_finnish">핀란드어</string>
+    <string name="lang_hungarian">헝가리어</string>
+    <string name="lang_romanian">루마니아어</string>
+    <string name="lang_greek">그리스어</string>
+    <string name="lang_bulgarian">불가리아어</string>
+    <string name="lang_ukrainian">우크라이나어</string>
+    <string name="lang_croatian">크로아티아어</string>
+    <string name="lang_estonian">에스토니아어</string>
+    <string name="lang_latvian">라트비아어</string>
+    <string name="lang_lithuanian">리투아니아어</string>
+    <string name="lang_slovak">슬로바키아어</string>
+    <string name="lang_slovenian">슬로베니아어</string>
     <string name="advanced_normalization_label">고급 정규화</string>
     <string name="advanced_normalization_desc">숫자, 단위 등에 대해 영어식 규칙을 적용합니다.</string>
 

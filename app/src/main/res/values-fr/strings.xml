@@ -36,6 +36,14 @@
     <string name="play_now">Lire maintenant</string>
     <string name="added_to_queue">Ajouté à la file d\'attente</string>
 
+    <string name="v3_download_title">Télécharger les modèles Supertonic-3 ?</string>
+    <string name="v3_download_message">Supertonic-3 prend en charge 31 langues avec une qualité et une expressivité supérieures. Cela nécessite un téléchargement supplémentaire (~385 Mo). Voulez-vous le télécharger maintenant ?</string>
+    <string name="v3_download_button">Télécharger</string>
+    <string name="v3_delete_title">Supprimer les modèles Supertonic-3 ?</string>
+    <string name="v3_delete_message">Cela supprimera les modèles Supertonic-3 pour libérer de l\'espace (~385 Mo). Vous pouvez les télécharger à nouveau si nécessaire.</string>
+    <string name="v3_deleted_msg">Modèles Supertonic-3 supprimés</string>
+    <string name="switched_to_model_fmt">Basculé vers le modèle %1$s</string>
+
     <!-- Playback Activity -->
     <string name="now_playing_title">Lecture en cours</string>
     <string name="saving_audio">Enregistrement de l\'audio…</string>
@@ -80,6 +88,7 @@
     <string name="action_history">Historique</string>
     <string name="action_queue">File d\'attente</string>
     <string name="action_lexicon">Lexique</string>
+    <string name="action_delete_v3">Supprimer les modèles Supertonic-3</string>
     <string name="action_import">Importer JSON</string>
     <string name="action_export">Exporter JSON</string>
     
@@ -91,6 +100,32 @@
     <string name="lang_portuguese">Portugais</string>
     <string name="lang_spanish">Espagnol</string>
     <string name="lang_korean">Coréen</string>
+    <string name="lang_japanese">Japonais</string>
+    <string name="lang_german">Allemand</string>
+    <string name="lang_italian">Italien</string>
+    <string name="lang_dutch">Néerlandais</string>
+    <string name="lang_polish">Polonais</string>
+    <string name="lang_russian">Russe</string>
+    <string name="lang_turkish">Turc</string>
+    <string name="lang_arabic">Arabe</string>
+    <string name="lang_hindi">Hindi</string>
+    <string name="lang_vietnamese">Vietnamien</string>
+    <string name="lang_indonesian">Indonésien</string>
+    <string name="lang_czech">Tchèque</string>
+    <string name="lang_swedish">Suédois</string>
+    <string name="lang_danish">Danois</string>
+    <string name="lang_finnish">Finnois</string>
+    <string name="lang_hungarian">Hongrois</string>
+    <string name="lang_romanian">Roumain</string>
+    <string name="lang_greek">Grec</string>
+    <string name="lang_bulgarian">Bulgare</string>
+    <string name="lang_ukrainian">Ukrainien</string>
+    <string name="lang_croatian">Croate</string>
+    <string name="lang_estonian">Estonien</string>
+    <string name="lang_latvian">Letton</string>
+    <string name="lang_lithuanian">Lituanien</string>
+    <string name="lang_slovak">Slovaque</string>
+    <string name="lang_slovenian">Slovène</string>
     <string name="advanced_normalization_label">Normalisation avancée</string>
     <string name="advanced_normalization_desc">Applique les règles de type anglais pour les nombres, les unités, etc.</string>
 
