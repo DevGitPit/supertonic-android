@@ -27,18 +27,6 @@ object AssetManager {
         "voice_styles/F1.json", "voice_styles/F2.json", "voice_styles/F3.json", "voice_styles/F4.json", "voice_styles/F5.json"
     )
 
-    private val V2_FILES = listOf(
-        "onnx/duration_predictor.onnx",
-        "onnx/text_encoder.onnx",
-        "onnx/vector_estimator.onnx",
-        "onnx/vocoder.onnx",
-        "onnx/tts.json",
-        "onnx/unicode_indexer.json",
-        // V2 voices (same names, different files)
-        "voice_styles/M1.json", "voice_styles/M2.json", "voice_styles/M3.json", "voice_styles/M4.json", "voice_styles/M5.json",
-        "voice_styles/F1.json", "voice_styles/F2.json", "voice_styles/F3.json", "voice_styles/F4.json", "voice_styles/F5.json"
-    )
-
     private val V3_FILES = listOf(
         "onnx/duration_predictor.onnx",
         "onnx/text_encoder.onnx",
@@ -53,7 +41,6 @@ object AssetManager {
 
     private fun filesFor(version: ModelVersion): List<String> = when (version) {
         ModelVersion.V1 -> V1_FILES
-        ModelVersion.V2 -> V2_FILES
         ModelVersion.V3 -> V3_FILES
     }
 
@@ -64,7 +51,6 @@ object AssetManager {
     }
 
     fun isV1Ready(context: Context): Boolean = isReady(context, ModelVersion.V1)
-    fun isV2Ready(context: Context): Boolean = isReady(context, ModelVersion.V2)
     fun isV3Ready(context: Context): Boolean = isReady(context, ModelVersion.V3)
 
     suspend fun download(context: Context, version: ModelVersion, onProgress: (String, Float, Long, Long) -> Unit) {

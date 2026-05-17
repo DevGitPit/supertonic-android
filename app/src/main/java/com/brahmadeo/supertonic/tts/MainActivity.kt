@@ -50,15 +50,11 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
     private lateinit var ebookParser: EbookParser
 
-    // Data — derived from ModelVersion so the picker only ever lists langs the engine actually supports.
-    // Order: English first, then v2 langs, then the remaining v3-only langs.
     private val languages: Map<Int, String> = run {
-        val v2 = ModelVersion.V2.supportedLangs
         val v3 = ModelVersion.V3.supportedLangs
         val ordered = buildList {
             add("en")
-            addAll(v2)
-            addAll(v3.filter { it != "en" && it !in v2 })
+            addAll(v3.filter { it != "en" })
         }
         ordered.mapNotNull { code -> ModelVersion.LANG_DISPLAY_RES[code]?.let { it to code } }.toMap()
     }
@@ -192,11 +188,11 @@ class MainActivity : ComponentActivity() {
         QueueManager.initialize(this)
 
         // Initial setup based on saved language
+        AssetManager.deleteVersion(this, "v2")
         viewModel.refreshReadiness(this)
         val savedLang = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).getString("selected_lang", MainViewModel.DEFAULT_LANG) ?: MainViewModel.DEFAULT_LANG
         currentModelVersion = ModelVersion.resolve(
             savedLang = savedLang,
-            isV2Ready = viewModel.isV2Ready.value,
             isV3Ready = viewModel.isV3Ready.value,
         )
 
@@ -235,61 +231,6 @@ class MainActivity : ComponentActivity() {
                                     playNow(viewModel.queueDialogText)
                                     viewModel.showQueueDialog.value = false
                                 }) { Text(getString(R.string.play_now)) }
-                            }
-                        )
-                    }
-
-                    if (viewModel.showV2ConfirmDialog.value) {
-                        androidx.compose.material3.AlertDialog(
-                            onDismissRequest = {
-                                viewModel.showV2ConfirmDialog.value = false
-                                viewModel.currentLang.value = "en"
-                                saveStringPref("selected_lang", "en")
-                                switchModel(ModelVersion.V1)
-                            },
-                            title = { Text(getString(R.string.v2_download_title)) },
-                            text = { Text(getString(R.string.v2_download_message)) },
-                            confirmButton = {
-                                TextButton(onClick = {
-                                    val lang = viewModel.pendingLangCode
-                                    viewModel.currentLang.value = lang
-                                    saveStringPref("selected_lang", lang)
-                                    viewModel.showV2ConfirmDialog.value = false
-                                    switchModel(ModelVersion.V2)
-                                }) { Text(getString(R.string.v2_download_button)) }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = {
-                                    viewModel.showV2ConfirmDialog.value = false
-                                    viewModel.currentLang.value = "en"
-                                    saveStringPref("selected_lang", "en")
-                                    switchModel(ModelVersion.V1)
-                                }) { Text(getString(R.string.cancel)) }
-                            }
-                        )
-                    }
-
-                    if (viewModel.showV2DeleteDialog.value) {
-                        androidx.compose.material3.AlertDialog(
-                            onDismissRequest = { viewModel.showV2DeleteDialog.value = false },
-                            title = { Text(getString(R.string.v2_delete_title)) },
-                            text = { Text(getString(R.string.v2_delete_message)) },
-                            confirmButton = {
-                                TextButton(
-                                    onClick = {
-                                        AssetManager.deleteVersion(this@MainActivity, ModelVersion.V2)
-                                        viewModel.refreshReadiness(this@MainActivity)
-                                        viewModel.showV2DeleteDialog.value = false
-                                        viewModel.currentLang.value = "en"
-                                        saveStringPref("selected_lang", "en")
-                                        switchModel(ModelVersion.V1)
-                                        Toast.makeText(this@MainActivity, getString(R.string.v2_deleted_msg), Toast.LENGTH_SHORT).show()
-                                    },
-                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                                ) { Text(getString(R.string.delete)) }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { viewModel.showV2DeleteDialog.value = false }) { Text(getString(R.string.cancel)) }
                             }
                         )
                     }
@@ -379,15 +320,10 @@ class MainActivity : ComponentActivity() {
                                 saveStringPref("selected_lang", it)
                                 switchModel(ModelVersion.V1)
                             } else {
-                                val targetVersion = when {
-                                    viewModel.isV3Ready.value -> ModelVersion.V3
-                                    viewModel.isV2Ready.value && ModelVersion.V2.supportedLangs.contains(it) -> ModelVersion.V2
-                                    else -> null
-                                }
-                                if (targetVersion != null) {
+                                if (viewModel.isV3Ready.value) {
                                     viewModel.currentLang.value = it
                                     saveStringPref("selected_lang", it)
-                                    switchModel(targetVersion)
+                                    switchModel(ModelVersion.V3)
                                 } else {
                                     viewModel.pendingLangCode = it
                                     viewModel.showV3ConfirmDialog.value = true
@@ -464,7 +400,6 @@ class MainActivity : ComponentActivity() {
                         onHistoryClick = { historyLauncher.launch(Intent(this, HistoryActivity::class.java)) },
                         onQueueClick = { startActivity(Intent(this, QueueActivity::class.java)) },
                         onLexiconClick = { startActivity(Intent(this, LexiconActivity::class.java)) },
-                        onDeleteV2Click = { viewModel.showV2DeleteDialog.value = true },
                         onDeleteV3Click = { viewModel.showV3DeleteDialog.value = true },
                         onOpenEbookClick = {
                             try {
@@ -479,7 +414,6 @@ class MainActivity : ComponentActivity() {
                                 ebookLauncher.launch(arrayOf("application/epub+zip", "application/pdf"))
                             }
                         },
-                        isV2Ready = viewModel.isV2Ready.value,
                         isV3Ready = viewModel.isV3Ready.value,
 
                         canResume = viewModel.canResume.value,
@@ -562,7 +496,6 @@ class MainActivity : ComponentActivity() {
 
     private fun isReady(version: ModelVersion): Boolean = when (version) {
         ModelVersion.V1 -> viewModel.isV1Ready.value
-        ModelVersion.V2 -> viewModel.isV2Ready.value
         ModelVersion.V3 -> viewModel.isV3Ready.value
     }
 

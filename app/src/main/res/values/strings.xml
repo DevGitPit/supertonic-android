@@ -36,13 +36,6 @@
     <string name="play_now">Play Now</string>
     <string name="added_to_queue">Added to queue</string>
 
-    <string name="v2_download_title">Download Multilingual Models?</string>
-    <string name="v2_download_message">Supporting French, Spanish, Portuguese, and Korean requires an additional download (~255MB). Do you want to download it now?</string>
-    <string name="v2_download_button">Download</string>
-    <string name="v2_delete_title">Delete Multilingual Models?</string>
-    <string name="v2_delete_message">This will remove all multilingual models and voice styles to free up space (~255MB). You can download them again later if needed.</string>
-    <string name="v2_deleted_msg">Multilingual models deleted</string>
-
     <string name="v3_download_title">Download Supertonic-3 Models?</string>
     <string name="v3_download_message">Supertonic-3 supports 31 languages with higher quality and expression. This requires an additional download (~385MB). Do you want to download it now?</string>
     <string name="v3_download_button">Download</string>
@@ -95,7 +88,6 @@
     <string name="action_history">History</string>
     <string name="action_queue">Queue</string>
     <string name="action_lexicon">Lexicon</string>
-    <string name="action_delete_v2">Delete Multilingual Models (v2)</string>
     <string name="action_delete_v3">Delete Supertonic-3 Models</string>
     <string name="action_import">Import JSON</string>
     <string name="action_export">Export JSON</string>

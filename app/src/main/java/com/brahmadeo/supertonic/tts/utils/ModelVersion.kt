@@ -19,11 +19,6 @@ enum class ModelVersion(
         baseUrl = "https://huggingface.co/Supertone/supertonic/resolve/main",
         supportedLangs = setOf("en")
     ),
-    V2(
-        dirName = "v2",
-        baseUrl = "https://huggingface.co/Supertone/supertonic-2/resolve/main",
-        supportedLangs = setOf("ko", "es", "pt", "fr")
-    ),
     V3(
         dirName = "v3",
         baseUrl = "https://huggingface.co/Supertone/supertonic-3/resolve/main",
@@ -36,10 +31,9 @@ enum class ModelVersion(
 
     companion object {
         /** Resolves the model version to use given the user's saved language and readiness state. */
-        fun resolve(savedLang: String, isV2Ready: Boolean, isV3Ready: Boolean): ModelVersion = when {
+        fun resolve(savedLang: String, isV3Ready: Boolean): ModelVersion = when {
             savedLang == "en" -> V1
             isV3Ready -> V3
-            isV2Ready && V2.supportedLangs.contains(savedLang) -> V2
             else -> V3
         }
 

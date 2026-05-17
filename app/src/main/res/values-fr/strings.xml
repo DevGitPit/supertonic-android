@@ -36,13 +36,6 @@
     <string name="play_now">Lire maintenant</string>
     <string name="added_to_queue">Ajouté à la file d\'attente</string>
 
-    <string name="v2_download_title">Télécharger les modèles multilingues ?</string>
-    <string name="v2_download_message">La prise en charge du français, de l\'espagnol, du portugais et du coréen nécessite un téléchargement supplémentaire (~350 Mo). Voulez-vous le télécharger maintenant ?</string>
-    <string name="v2_download_button">Télécharger</string>
-    <string name="v2_delete_title">Supprimer les modèles multilingues ?</string>
-    <string name="v2_delete_message">Cela supprimera tous les modèles multilingues et styles de voix pour libérer de l\'espace (~350 Mo). Vous pourrez les télécharger à nouveau plus tard si nécessaire.</string>
-    <string name="v2_deleted_msg">Modèles multilingues supprimés</string>
-
     <!-- Playback Activity -->
     <string name="now_playing_title">Lecture en cours</string>
     <string name="saving_audio">Enregistrement de l\'audio…</string>
@@ -87,7 +80,6 @@
     <string name="action_history">Historique</string>
     <string name="action_queue">File d\'attente</string>
     <string name="action_lexicon">Lexique</string>
-    <string name="action_delete_v2">Supprimer les modèles multilingues</string>
     <string name="action_import">Importer JSON</string>
     <string name="action_export">Exporter JSON</string>
     

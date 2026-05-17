@@ -190,7 +190,6 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
 
     private fun resolveModelVersion(savedLang: String): ModelVersion = ModelVersion.resolve(
         savedLang = savedLang,
-        isV2Ready = AssetManager.isV2Ready(this),
         isV3Ready = AssetManager.isV3Ready(this),
     )
 

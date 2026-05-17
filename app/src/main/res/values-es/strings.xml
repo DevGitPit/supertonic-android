@@ -36,13 +36,6 @@
     <string name="play_now">Reproducir ahora</string>
     <string name="added_to_queue">Añadido a la cola</string>
 
-    <string name="v2_download_title">¿Descargar modelos multilingües?</string>
-    <string name="v2_download_message">El soporte para francés, español, portugués y coreano requiere una descarga adicional (~350 MB). ¿Desea descargarlo ahora?</string>
-    <string name="v2_download_button">Descargar</string>
-    <string name="v2_delete_title">¿Eliminar modelos multilingües?</string>
-    <string name="v2_delete_message">Esto eliminará todos los modelos multilingües y estilos de voz para liberar espacio (~350 MB). Puede descargarlos nuevamente más tarde si es necesario.</string>
-    <string name="v2_deleted_msg">Modelos multilingües eliminados</string>
-
     <!-- Playback Activity -->
     <string name="now_playing_title">Reproduciendo ahora</string>
     <string name="saving_audio">Guardando audio…</string>
@@ -89,7 +82,6 @@
     <string name="action_history">Historial</string>
     <string name="action_queue">Cola</string>
     <string name="action_lexicon">Léxico</string>
-    <string name="action_delete_v2">Eliminar modelos multilingües</string>
     <string name="action_import">Importar JSON</string>
     <string name="action_export">Exportar JSON</string>
     

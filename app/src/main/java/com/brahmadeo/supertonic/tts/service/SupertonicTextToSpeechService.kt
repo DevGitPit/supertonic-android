@@ -65,7 +65,6 @@ class SupertonicTextToSpeechService : TextToSpeechService() {
 
     private fun resolveModelVersion(savedLang: String): ModelVersion = ModelVersion.resolve(
         savedLang = savedLang,
-        isV2Ready = AssetManager.isV2Ready(this),
         isV3Ready = AssetManager.isV3Ready(this),
     )
 
@@ -90,13 +89,8 @@ class SupertonicTextToSpeechService : TextToSpeechService() {
         if (AssetManager.isV3Ready(this) && normalizedLang in ModelVersion.V3.supportedLangs) {
             return available(File(filesDir, "${ModelVersion.V3.dirName}/onnx"))
         }
-        if (AssetManager.isV2Ready(this) && normalizedLang in ModelVersion.V2.supportedLangs) {
-            return available(File(filesDir, "${ModelVersion.V2.dirName}/onnx"))
-        }
 
-        val anyKnown = normalizedLang in ModelVersion.V3.supportedLangs ||
-            normalizedLang in ModelVersion.V2.supportedLangs ||
-            normalizedLang == "en"
+        val anyKnown = normalizedLang in ModelVersion.V3.supportedLangs || normalizedLang == "en"
         return if (anyKnown) TextToSpeech.LANG_MISSING_DATA else TextToSpeech.LANG_NOT_SUPPORTED
     }
 
@@ -159,7 +153,6 @@ class SupertonicTextToSpeechService : TextToSpeechService() {
             addVoicesFor(ModelVersion.V3)
         } else {
             if (AssetManager.isV1Ready(this)) addVoicesFor(ModelVersion.V1)
-            if (AssetManager.isV2Ready(this)) addVoicesFor(ModelVersion.V2)
         }
 
         return voicesList
@@ -284,6 +277,5 @@ class SupertonicTextToSpeechService : TextToSpeechService() {
         }
 
         copyDir("v1", File(filesDir, "v1"))
-        copyDir("v2", File(filesDir, "v2"))
     }
 }

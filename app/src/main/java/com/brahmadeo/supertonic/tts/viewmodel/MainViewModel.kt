@@ -43,20 +43,16 @@ class MainViewModel : ViewModel() {
     // Dialog State
     var showQueueDialog = mutableStateOf(false)
     var queueDialogText = ""
-    var showV2ConfirmDialog = mutableStateOf(false)
-    var showV2DeleteDialog = mutableStateOf(false)
     var showV3ConfirmDialog = mutableStateOf(false)
     var showV3DeleteDialog = mutableStateOf(false)
     var pendingLangCode = ""
 
     // Asset readiness (cached, recomputed via refreshReadiness so Compose doesn't stat files on every recomposition)
     var isV1Ready = mutableStateOf(false)
-    var isV2Ready = mutableStateOf(false)
     var isV3Ready = mutableStateOf(false)
 
     fun refreshReadiness(context: Context) {
         isV1Ready.value = AssetManager.isV1Ready(context)
-        isV2Ready.value = AssetManager.isV2Ready(context)
         isV3Ready.value = AssetManager.isV3Ready(context)
     }
 

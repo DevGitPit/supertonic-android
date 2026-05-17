@@ -36,13 +36,6 @@
     <string name="play_now">즉시 재생</string>
     <string name="added_to_queue">대기열에 추가됨</string>
 
-    <string name="v2_download_title">다국어 모델을 다운로드할까요?</string>
-    <string name="v2_download_message">프랑스어, 스페인어, 포르투갈어 및 한국어를 지원하려면 추가 다운로드(~350MB)가 필요합니다. 지금 다운로드하시겠습니까?</string>
-    <string name="v2_download_button">다운로드</string>
-    <string name="v2_delete_title">다국어 모델을 삭제할까요?</string>
-    <string name="v2_delete_message">모든 다국어 모델과 음성 스타일이 삭제되어 공간(~350MB)을 확보합니다. 나중에 필요할 때 다시 다운로드할 수 있습니다.</string>
-    <string name="v2_deleted_msg">다국어 모델이 삭제되었습니다.</string>
-
     <!-- Playback Activity -->
     <string name="now_playing_title">현재 재생 중</string>
     <string name="saving_audio">오디오 저장 중…</string>
@@ -89,7 +82,6 @@
     <string name="action_history">기록</string>
     <string name="action_queue">대기열</string>
     <string name="action_lexicon">사전</string>
-    <string name="action_delete_v2">다국어 모델 삭제</string>
     <string name="action_import">JSON 가져오기</string>
     <string name="action_export">JSON 내보내기</string>
     
