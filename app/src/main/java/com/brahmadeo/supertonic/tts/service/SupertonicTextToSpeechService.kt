@@ -90,6 +90,8 @@ class SupertonicTextToSpeechService : TextToSpeechService() {
             return available(File(filesDir, "${ModelVersion.V3.dirName}/onnx"))
         }
 
+        // LANG_MISSING_DATA tells the system the language is known but not yet downloaded,
+        // whereas LANG_NOT_SUPPORTED means this engine will never handle it.
         val anyKnown = normalizedLang in ModelVersion.V3.supportedLangs || normalizedLang == "en"
         return if (anyKnown) TextToSpeech.LANG_MISSING_DATA else TextToSpeech.LANG_NOT_SUPPORTED
     }

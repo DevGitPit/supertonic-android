@@ -30,7 +30,11 @@ enum class ModelVersion(
     );
 
     companion object {
-        /** Resolves the model version to use given the user's saved language and readiness state. */
+        /**
+         * Resolves the model version to use given the user's saved language and readiness state.
+         * English always uses V1 (bundled). All other languages use V3, even when V3 is not yet
+         * downloaded — callers are expected to trigger a download in that case.
+         */
         fun resolve(savedLang: String, isV3Ready: Boolean): ModelVersion = when {
             savedLang == "en" -> V1
             isV3Ready -> V3

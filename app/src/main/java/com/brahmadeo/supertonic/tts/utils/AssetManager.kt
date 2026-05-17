@@ -57,6 +57,11 @@ object AssetManager {
         downloadVersion(context, version.dirName, version.baseUrl, filesFor(version), onProgress)
     }
 
+    /**
+     * Probes a remote file's total size without downloading it. Uses a one-byte range request
+     * (Range: bytes=0-0) because HEAD responses from HuggingFace omit Content-Length for
+     * redirected URLs, while a GET with a range header returns the full size in Content-Range.
+     */
     private fun probeFileSize(urlString: String): Long {
         var lastException: Exception? = null
         repeat(MAX_RETRIES) { attempt ->
@@ -167,7 +172,8 @@ object AssetManager {
             val baseDir = File(context.filesDir, version)
             if (!baseDir.exists()) baseDir.mkdirs()
 
-            // Pre-pass: compute stable total before any downloading begins
+            // Pre-pass: probe every file's size upfront so the progress bar has a stable
+            // denominator from the start (avoids jumpy / incorrect percentages mid-download).
             var totalBytes = 0L
             files.forEach { relativePath ->
                 val targetFile = File(baseDir, relativePath)

@@ -35,6 +35,8 @@ class CheckDataActivity : Activity() {
         val v1Installed = AssetManager.isV1Ready(this) && File(filesDir, "${ModelVersion.V1.dirName}/onnx").exists()
         val v3Installed = AssetManager.isV3Ready(this) && File(filesDir, "${ModelVersion.V3.dirName}/onnx").exists()
 
+        // V3 supersedes V1 for all languages once installed. If only V1 is present, English is
+        // available and all V3 languages are listed as unavailable (prompts system to install).
         if (v3Installed) {
             addLangs(ModelVersion.V3, availableVoices)
         } else {

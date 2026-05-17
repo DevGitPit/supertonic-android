@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
     private lateinit var ebookParser: EbookParser
 
+    // English always first in the picker; remaining V3 languages follow in set iteration order.
     private val languages: Map<Int, String> = run {
         val v3 = ModelVersion.V3.supportedLangs
         val ordered = buildList {
@@ -187,7 +188,7 @@ class MainActivity : ComponentActivity() {
         LexiconManager.load(this)
         QueueManager.initialize(this)
 
-        // Initial setup based on saved language
+        // One-time migration: v2 was removed when V3 support landed; delete any leftover files.
         AssetManager.deleteVersion(this, "v2")
         viewModel.refreshReadiness(this)
         val savedLang = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).getString("selected_lang", MainViewModel.DEFAULT_LANG) ?: MainViewModel.DEFAULT_LANG
