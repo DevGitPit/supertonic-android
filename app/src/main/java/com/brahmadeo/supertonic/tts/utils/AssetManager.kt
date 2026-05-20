@@ -3,9 +3,6 @@ package com.brahmadeo.supertonic.tts.utils
 import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -108,11 +105,11 @@ object AssetManager {
         onChunk: (bytesWritten: Long) -> Unit
     ) {
         val partFile = File(targetFile.parent, "${targetFile.name}.part")
-        val resumeOffset = if (partFile.exists()) partFile.length() else 0L
 
         var lastException: Exception? = null
         repeat(MAX_RETRIES) { attempt ->
             try {
+                val resumeOffset = if (partFile.exists()) partFile.length() else 0L
                 val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                     instanceFollowRedirects = true
                     connectTimeout = CONNECT_TIMEOUT_MS
@@ -126,6 +123,11 @@ object AssetManager {
                         Log.w(TAG, "Rate limited downloading $url, waiting ${retryAfter}s")
                         Thread.sleep(retryAfter * 1_000)
                         throw Exception("HTTP 429 for $url")
+                    }
+                    if (responseCode == 416) {
+                        Log.w(TAG, "Range not satisfiable for $url, discarding partial file and retrying from start")
+                        partFile.delete()
+                        throw Exception("HTTP 416 for $url")
                     }
                     val appending = responseCode == HttpURLConnection.HTTP_PARTIAL
                     if (responseCode != HttpURLConnection.HTTP_OK && !appending) {
@@ -179,14 +181,15 @@ object AssetManager {
 
             // Pre-pass: probe every file's size upfront so the progress bar has a stable
             // denominator from the start (avoids jumpy / incorrect percentages mid-download).
-            val totalBytes = coroutineScope {
-                files.map { relativePath ->
-                    async {
-                        val targetFile = File(baseDir, relativePath)
-                        if (targetFile.exists()) targetFile.length()
-                        else probeFileSize("$baseUrl/$relativePath").coerceAtLeast(0L)
-                    }
-                }.awaitAll().sum()
+            var totalBytes = 0L
+            files.forEach { relativePath ->
+                val targetFile = File(baseDir, relativePath)
+                if (targetFile.exists()) {
+                    totalBytes += targetFile.length()
+                } else {
+                    val len = probeFileSize("$baseUrl/$relativePath")
+                    if (len > 0) totalBytes += len
+                }
             }
             Log.d(TAG, "Pre-computed total size: $totalBytes bytes")
 
