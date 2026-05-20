@@ -38,7 +38,7 @@ import com.brahmadeo.supertonic.tts.utils.LexiconManager
 import com.brahmadeo.supertonic.tts.utils.QueueManager
 import com.brahmadeo.supertonic.tts.viewmodel.MainViewModel
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -506,7 +506,7 @@ class MainActivity : ComponentActivity() {
         viewModel.downloadError.value = null
         viewModel.downloadedBytes.longValue = 0L
         viewModel.totalBytes.longValue = 0L
-        CoroutineScope(Dispatchers.IO).launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val progressCallback: (String, Float, Long, Long) -> Unit = { status, progress, bytesDownloaded, totalBytes ->
                     runOnUiThread {
@@ -549,7 +549,7 @@ class MainActivity : ComponentActivity() {
         currentModelVersion = version
         viewModel.isInitializing.value = true
 
-        CoroutineScope(Dispatchers.IO).launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             withContext(Dispatchers.Main) {
                 setupVoicesMap(version, viewModel.currentLang.value)
             }

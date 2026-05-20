@@ -3,6 +3,9 @@ package com.brahmadeo.supertonic.tts.utils
 import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -141,7 +144,9 @@ object AssetManager {
                 } finally {
                     conn.disconnect()
                 }
-                partFile.renameTo(targetFile)
+                if (!partFile.renameTo(targetFile)) {
+                    throw java.io.IOException("Failed to rename ${partFile.name} to ${targetFile.absolutePath}")
+                }
                 return
             } catch (e: Exception) {
                 lastException = e
@@ -174,15 +179,14 @@ object AssetManager {
 
             // Pre-pass: probe every file's size upfront so the progress bar has a stable
             // denominator from the start (avoids jumpy / incorrect percentages mid-download).
-            var totalBytes = 0L
-            files.forEach { relativePath ->
-                val targetFile = File(baseDir, relativePath)
-                if (targetFile.exists()) {
-                    totalBytes += targetFile.length()
-                } else {
-                    val len = probeFileSize("$baseUrl/$relativePath")
-                    if (len > 0) totalBytes += len
-                }
+            val totalBytes = coroutineScope {
+                files.map { relativePath ->
+                    async {
+                        val targetFile = File(baseDir, relativePath)
+                        if (targetFile.exists()) targetFile.length()
+                        else probeFileSize("$baseUrl/$relativePath").coerceAtLeast(0L)
+                    }
+                }.awaitAll().sum()
             }
             Log.d(TAG, "Pre-computed total size: $totalBytes bytes")
 
