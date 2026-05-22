@@ -2,6 +2,7 @@ package com.brahmadeo.supertonic.tts.viewmodel
 
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -33,6 +34,8 @@ class MainViewModel : ViewModel() {
     var downloadingVersion = mutableStateOf("v1")
     var downloadProgress = mutableFloatStateOf(0f)
     var downloadStatus = mutableStateOf("Checking assets...")
+    var downloadedBytes = mutableLongStateOf(0L)
+    var totalBytes = mutableLongStateOf(0L)
     var downloadError = mutableStateOf<String?>(null)
 
     // Dialog State
