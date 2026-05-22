@@ -8,7 +8,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
-import java.net.URL
+import java.net.URI
 
 object AssetManager {
     fun getModelVersionForLanguage(lang: String): String {
@@ -102,7 +102,7 @@ object AssetManager {
     private suspend fun probeFileSize(urlString: String): Long {
         var lastException: Exception? = null
         repeat(MAX_RETRIES) { attempt ->
-            val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
+            val conn = (URI(urlString).toURL().openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 instanceFollowRedirects = true
                 connectTimeout = CONNECT_TIMEOUT_MS
@@ -147,7 +147,7 @@ object AssetManager {
         repeat(MAX_RETRIES) { attempt ->
             try {
                 val resumeOffset = if (partFile.exists()) partFile.length() else 0L
-                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                val conn = (URI(url).toURL().openConnection() as HttpURLConnection).apply {
                     instanceFollowRedirects = true
                     connectTimeout = CONNECT_TIMEOUT_MS
                     readTimeout = READ_TIMEOUT_MS
