@@ -3,6 +3,7 @@ package com.brahmadeo.supertonic.tts.utils
 import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -98,7 +99,7 @@ object AssetManager {
      * (Range: bytes=0-0) because HEAD responses from HuggingFace omit Content-Length for
      * redirected URLs, while a GET with a range header returns the full size in Content-Range.
      */
-    private fun probeFileSize(urlString: String): Long {
+    private suspend fun probeFileSize(urlString: String): Long {
         var lastException: Exception? = null
         repeat(MAX_RETRIES) { attempt ->
             val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
@@ -114,7 +115,7 @@ object AssetManager {
                 if (responseCode == 429) {
                     val retryAfter = conn.getHeaderField("Retry-After")?.toLongOrNull() ?: 60L
                     Log.w(TAG, "Rate limited probing $urlString, waiting ${retryAfter}s")
-                    Thread.sleep(retryAfter * 1_000)
+                    delay(retryAfter * 1_000)
                     lastException = Exception("HTTP 429 for $urlString")
                     return@repeat
                 }
@@ -127,7 +128,7 @@ object AssetManager {
             } catch (e: Exception) {
                 lastException = e
                 Log.w(TAG, "Probe attempt ${attempt + 1}/$MAX_RETRIES failed for $urlString: ${e.message}")
-                if (attempt < MAX_RETRIES - 1) Thread.sleep(1_000L * (attempt + 1))
+                if (attempt < MAX_RETRIES - 1) delay(1_000L * (attempt + 1))
             } finally {
                 conn.disconnect()
             }
@@ -135,7 +136,7 @@ object AssetManager {
         throw lastException ?: Exception("Probe failed after $MAX_RETRIES attempts")
     }
 
-    private fun downloadFileWithResume(
+    private suspend fun downloadFileWithResume(
         url: String,
         targetFile: File,
         onChunk: (bytesWritten: Long) -> Unit
@@ -157,7 +158,7 @@ object AssetManager {
                     if (responseCode == 429) {
                         val retryAfter = conn.getHeaderField("Retry-After")?.toLongOrNull() ?: 60L
                         Log.w(TAG, "Rate limited downloading $url, waiting ${retryAfter}s")
-                        Thread.sleep(retryAfter * 1_000)
+                        delay(retryAfter * 1_000)
                         throw Exception("HTTP 429 for $url")
                     }
                     if (responseCode == 416) {
@@ -182,6 +183,7 @@ object AssetManager {
                 } finally {
                     conn.disconnect()
                 }
+                if (targetFile.exists()) targetFile.delete()
                 if (!partFile.renameTo(targetFile)) {
                     throw java.io.IOException("Failed to rename ${partFile.name} to ${targetFile.absolutePath}")
                 }
@@ -189,7 +191,7 @@ object AssetManager {
             } catch (e: Exception) {
                 lastException = e
                 Log.w(TAG, "Attempt ${attempt + 1}/$MAX_RETRIES failed for $url: ${e.message}")
-                if (attempt < MAX_RETRIES - 1) Thread.sleep(1_000L * (attempt + 1))
+                if (attempt < MAX_RETRIES - 1) delay(1_000L * (attempt + 1))
             }
         }
         throw lastException ?: Exception("Download failed after $MAX_RETRIES attempts")
@@ -247,15 +249,26 @@ object AssetManager {
                     totalBytes
                 )
 
+                var lastProgressUpdate = 0L
                 downloadFileWithResume(url, targetFile) { chunkBytes ->
                     cumulativeBytesDownloaded += chunkBytes
-                    onProgress(
-                        "Downloading $fileName",
-                        (cumulativeBytesDownloaded.toFloat() / totalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
-                        cumulativeBytesDownloaded,
-                        totalBytes
-                    )
+                    val now = System.currentTimeMillis()
+                    if (now - lastProgressUpdate > 100) {
+                        onProgress(
+                            "Downloading $fileName",
+                            (cumulativeBytesDownloaded.toFloat() / totalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
+                            cumulativeBytesDownloaded,
+                            totalBytes
+                        )
+                        lastProgressUpdate = now
+                    }
                 }
+                onProgress(
+                    "Downloading $fileName",
+                    (cumulativeBytesDownloaded.toFloat() / totalBytes.coerceAtLeast(1)).coerceIn(0f, 1f),
+                    cumulativeBytesDownloaded,
+                    totalBytes
+                )
             }
             onProgress("Ready", 1.0f, cumulativeBytesDownloaded, totalBytes)
         }
