@@ -37,17 +37,17 @@
     <string name="added_to_queue">Added to queue</string>
 
     <string name="v2_download_title">Download Model v2?</string>
-    <string name="v2_download_message">Supporting French, Spanish, Portuguese, and Korean requires an additional download (~350MB). Do you want to download it now?</string>
+    <string name="v2_download_message">Supporting French, Spanish, Portuguese, and Korean requires an additional download (~255MB). Do you want to download it now?</string>
     <string name="v2_download_button">Download</string>
     <string name="v2_delete_title">Delete Model v2?</string>
-    <string name="v2_delete_message">This will remove the v2 model and voice styles to free up space (~350MB). You will lose support for French, Spanish, Portuguese, and Korean. You can download them again later if needed.</string>
+    <string name="v2_delete_message">This will remove the v2 model and voice styles to free up space (~255MB). You will lose support for French, Spanish, Portuguese, and Korean. You can download them again later if needed.</string>
     <string name="v2_deleted_msg">Model v2 deleted</string>
 
     <string name="v3_download_title">Download Model v3?</string>
-    <string name="v3_download_message">Supporting Japanese, Arabic, German, Hindi, Russian, and 21 other languages requires an additional download (~400MB). Do you want to download it now?</string>
+    <string name="v3_download_message">Supporting Japanese, Arabic, German, Hindi, Russian, and 21 other languages requires an additional download (~380MB). Do you want to download it now?</string>
     <string name="v3_download_button">Download</string>
     <string name="v3_delete_title">Delete Model v3?</string>
-    <string name="v3_delete_message">This will remove the v3 model and voice styles to free up space (~400MB). You will lose support for Japanese, Arabic, German, Hindi, Russian, and 21 other languages. You can download them again later if needed.</string>
+    <string name="v3_delete_message">This will remove the v3 model and voice styles to free up space (~380MB). You will lose support for Japanese, Arabic, German, Hindi, Russian, and 21 other languages. You can download them again later if needed.</string>
     <string name="v3_deleted_msg">Model v3 deleted</string>
 
     <!-- Playback Activity -->
