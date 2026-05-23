@@ -102,35 +102,37 @@ object AssetManager {
     private suspend fun probeFileSize(urlString: String): Long {
         var lastException: Exception? = null
         repeat(MAX_RETRIES) { attempt ->
-            val conn = (URI(urlString).toURL().openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                instanceFollowRedirects = true
-                connectTimeout = CONNECT_TIMEOUT_MS
-                readTimeout = READ_TIMEOUT_MS
-                setRequestProperty("Range", "bytes=0-0")
-            }
             try {
-                conn.connect()
-                val responseCode = conn.responseCode
-                if (responseCode == 429) {
-                    val retryAfter = conn.getHeaderField("Retry-After")?.toLongOrNull() ?: 60L
-                    Log.w(TAG, "Rate limited probing $urlString, waiting ${retryAfter}s")
-                    delay(retryAfter * 1_000)
-                    lastException = Exception("HTTP 429 for $urlString")
-                    return@repeat
+                val conn = (URI(urlString).toURL().openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    instanceFollowRedirects = true
+                    connectTimeout = CONNECT_TIMEOUT_MS
+                    readTimeout = READ_TIMEOUT_MS
+                    setRequestProperty("Range", "bytes=0-0")
                 }
-                val contentRange = conn.getHeaderField("Content-Range")
-                if (contentRange != null) {
-                    val total = contentRange.substringAfterLast('/').trim().toLongOrNull()
-                    if (total != null && total > 0) return total
+                try {
+                    conn.connect()
+                    val responseCode = conn.responseCode
+                    if (responseCode == 429) {
+                        val retryAfter = conn.getHeaderField("Retry-After")?.toLongOrNull() ?: 60L
+                        Log.w(TAG, "Rate limited probing $urlString, waiting ${retryAfter}s")
+                        delay(retryAfter * 1_000)
+                        lastException = Exception("HTTP 429 for $urlString")
+                        return@repeat
+                    }
+                    val contentRange = conn.getHeaderField("Content-Range")
+                    if (contentRange != null) {
+                        val total = contentRange.substringAfterLast('/').trim().toLongOrNull()
+                        if (total != null && total > 0) return total
+                    }
+                    return conn.contentLengthLong.takeIf { it > 0 } ?: 0L
+                } finally {
+                    conn.disconnect()
                 }
-                return conn.contentLengthLong.takeIf { it > 0 } ?: 0L
             } catch (e: Exception) {
                 lastException = e
                 Log.w(TAG, "Probe attempt ${attempt + 1}/$MAX_RETRIES failed for $urlString: ${e.message}")
                 if (attempt < MAX_RETRIES - 1) delay(1_000L * (attempt + 1))
-            } finally {
-                conn.disconnect()
             }
         }
         throw lastException ?: Exception("Probe failed after $MAX_RETRIES attempts")
