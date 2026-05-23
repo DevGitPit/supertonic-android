@@ -37,11 +37,18 @@
     <string name="added_to_queue">Añadido a la cola</string>
 
     <string name="v2_download_title">¿Descargar modelos multilingües?</string>
-    <string name="v2_download_message">El soporte para francés, español, portugués y coreano requiere una descarga adicional (~350 MB). ¿Desea descargarlo ahora?</string>
+    <string name="v2_download_message">El soporte para francés, español, portugués y coreano requiere una descarga adicional (~255 MB). ¿Desea descargarlo ahora?</string>
     <string name="v2_download_button">Descargar</string>
     <string name="v2_delete_title">¿Eliminar modelos multilingües?</string>
-    <string name="v2_delete_message">Esto eliminará todos los modelos multilingües y estilos de voz para liberar espacio (~350 MB). Puede descargarlos nuevamente más tarde si es necesario.</string>
+    <string name="v2_delete_message">Esto eliminará todos los modelos multilingües y estilos de voz para liberar espacio (~255 MB). Puede descargarlos nuevamente más tarde si es necesario.</string>
     <string name="v2_deleted_msg">Modelos multilingües eliminados</string>
+
+    <string name="v3_download_title">¿Descargar modelo v3?</string>
+    <string name="v3_download_message">El soporte para japonés, árabe, alemán, hindi, ruso y 21 otros idiomas requiere una descarga adicional (~380 MB). ¿Desea descargarlo ahora?</string>
+    <string name="v3_download_button">Descargar</string>
+    <string name="v3_delete_title">¿Eliminar modelo v3?</string>
+    <string name="v3_delete_message">Esto eliminará el modelo v3 y los estilos de voz para liberar espacio (~380 MB). Perderá el soporte para japonés, árabe, alemán, hindi, ruso y 21 otros idiomas. Puede descargarlo nuevamente más tarde si es necesario.</string>
+    <string name="v3_deleted_msg">Modelo v3 eliminado</string>
 
     <!-- Playback Activity -->
     <string name="now_playing_title">Reproduciendo ahora</string>

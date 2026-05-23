@@ -37,11 +37,18 @@
     <string name="added_to_queue">Ajouté à la file d\'attente</string>
 
     <string name="v2_download_title">Télécharger les modèles multilingues ?</string>
-    <string name="v2_download_message">La prise en charge du français, de l\'espagnol, du portugais et du coréen nécessite un téléchargement supplémentaire (~350 Mo). Voulez-vous le télécharger maintenant ?</string>
+    <string name="v2_download_message">La prise en charge du français, de l\'espagnol, du portugais et du coréen nécessite un téléchargement supplémentaire (~255 Mo). Voulez-vous le télécharger maintenant ?</string>
     <string name="v2_download_button">Télécharger</string>
     <string name="v2_delete_title">Supprimer les modèles multilingues ?</string>
-    <string name="v2_delete_message">Cela supprimera tous les modèles multilingues et styles de voix pour libérer de l\'espace (~350 Mo). Vous pourrez les télécharger à nouveau plus tard si nécessaire.</string>
+    <string name="v2_delete_message">Cela supprimera tous les modèles multilingues et styles de voix pour libérer de l\'espace (~255 Mo). Vous pourrez les télécharger à nouveau plus tard si nécessaire.</string>
     <string name="v2_deleted_msg">Modèles multilingues supprimés</string>
+
+    <string name="v3_download_title">Télécharger le modèle v3 ?</string>
+    <string name="v3_download_message">La prise en charge du japonais, de l\'arabe, de l\'allemand, du hindi, du russe et de 21 autres langues nécessite un téléchargement supplémentaire (~380 Mo). Voulez-vous le télécharger maintenant ?</string>
+    <string name="v3_download_button">Télécharger</string>
+    <string name="v3_delete_title">Supprimer le modèle v3 ?</string>
+    <string name="v3_delete_message">Cela supprimera le modèle v3 et les styles de voix pour libérer de l\'espace (~380 Mo). Vous perdrez la prise en charge du japonais, de l\'arabe, de l\'allemand, du hindi, du russe et de 21 autres langues. Vous pourrez les télécharger à nouveau plus tard si nécessaire.</string>
+    <string name="v3_deleted_msg">Modèle v3 supprimé</string>
 
     <!-- Playback Activity -->
     <string name="now_playing_title">Lecture en cours</string>

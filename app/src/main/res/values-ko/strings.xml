@@ -37,11 +37,18 @@
     <string name="added_to_queue">대기열에 추가됨</string>
 
     <string name="v2_download_title">다국어 모델을 다운로드할까요?</string>
-    <string name="v2_download_message">프랑스어, 스페인어, 포르투갈어 및 한국어를 지원하려면 추가 다운로드(~350MB)가 필요합니다. 지금 다운로드하시겠습니까?</string>
+    <string name="v2_download_message">프랑스어, 스페인어, 포르투갈어 및 한국어를 지원하려면 추가 다운로드(~255MB)가 필요합니다. 지금 다운로드하시겠습니까?</string>
     <string name="v2_download_button">다운로드</string>
     <string name="v2_delete_title">다국어 모델을 삭제할까요?</string>
-    <string name="v2_delete_message">모든 다국어 모델과 음성 스타일이 삭제되어 공간(~350MB)을 확보합니다. 나중에 필요할 때 다시 다운로드할 수 있습니다.</string>
+    <string name="v2_delete_message">모든 다국어 모델과 음성 스타일이 삭제되어 공간(~255MB)을 확보합니다. 나중에 필요할 때 다시 다운로드할 수 있습니다.</string>
     <string name="v2_deleted_msg">다국어 모델이 삭제되었습니다.</string>
+
+    <string name="v3_download_title">v3 모델을 다운로드할까요?</string>
+    <string name="v3_download_message">일본어, 아랍어, 독일어, 힌디어, 러시아어 및 21개의 다른 언어를 지원하려면 추가 다운로드(~380MB)가 필요합니다. 지금 다운로드하시겠습니까?</string>
+    <string name="v3_download_button">다운로드</string>
+    <string name="v3_delete_title">v3 모델을 삭제할까요?</string>
+    <string name="v3_delete_message">v3 모델과 음성 스타일이 삭제되어 공간(~380MB)을 확보합니다. 일본어, 아랍어, 독일어, 힌디어, 러시아어 및 21개의 다른 언어 지원을 잃게 됩니다. 나중에 필요할 때 다시 다운로드할 수 있습니다.</string>
+    <string name="v3_deleted_msg">v3 모델이 삭제되었습니다.</string>
 
     <!-- Playback Activity -->
     <string name="now_playing_title">현재 재생 중</string>
