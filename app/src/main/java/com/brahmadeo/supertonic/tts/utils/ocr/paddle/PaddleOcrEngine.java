@@ -74,7 +74,7 @@ public final class PaddleOcrEngine implements OcrEngine {
     private volatile String language;
     private volatile boolean highQualityDetectionEnabled;
 
-    PaddleOcrEngine(Context context) {
+    public PaddleOcrEngine(Context context) {
         this(context, defaultSupplier(context));
     }
 
