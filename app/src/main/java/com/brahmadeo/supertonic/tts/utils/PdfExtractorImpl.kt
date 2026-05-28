@@ -24,8 +24,8 @@ class PdfExtractorImpl(private val context: Context) : PdfExtractor {
             val renderer = PdfRenderer(pfd)
             val combinedText = StringBuilder()
 
-            // Default to Hindi/English mixed if not specified
-            ocrEngine.setLanguage("hi+en")
+            // Use Hindi model as default for mixed text support
+            ocrEngine.setLanguage("hi")
 
             for (index in pageIndices.sorted()) {
                 if (index !in 0 until renderer.pageCount) {
@@ -35,20 +35,26 @@ class PdfExtractorImpl(private val context: Context) : PdfExtractor {
                 
                 Log.d("PdfExtractor", "Processing page $index with PaddleOCR...")
                 renderer.openPage(index).use { page ->
-                    // 2x resolution is usually enough for PaddleOCR as it's more robust than ML Kit
-                    val zoom = 2
+                    // 3x resolution for high-fidelity OCR on complex scripts
+                    val zoom = 3
                     val bitmap = Bitmap.createBitmap(page.width * zoom, page.height * zoom, Bitmap.Config.ARGB_8888)
-                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                     
                     try {
+                        Log.d("PdfExtractor", "Rendering page $index to bitmap ${bitmap.width}x${bitmap.height}...")
+                        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        
+                        Log.d("PdfExtractor", "Running OCR on page $index...")
                         val result = ocrEngine.run(bitmap)
+                        Log.d("PdfExtractor", "OCR completed for page $index. Text length: ${result.text.length}, Confidence: ${result.meanConfidence}")
+                        
                         if (result.text.isNotBlank()) {
                             combinedText.append(result.text).append("\n\n")
                         } else {
-                            Log.w("PdfExtractor", "Page $index: No text detected")
+                            Log.w("PdfExtractor", "Page $index: No text detected (Empty result)")
                         }
                     } catch (e: Exception) {
-                        Log.e("PdfExtractor", "OCR failed for page $index", e)
+                        Log.e("PdfExtractor", "OCR process failed for page $index: ${e.message}", e)
+                        throw Exception("OCR failed on page ${index + 1}: ${e.message}")
                     } finally {
                         bitmap.recycle()
                     }
@@ -59,9 +65,13 @@ class PdfExtractorImpl(private val context: Context) : PdfExtractor {
             pfd.close()
             
             val finalResult = combinedText.toString().trim()
+            if (finalResult.isEmpty()) {
+                Log.w("PdfExtractor", "No text extracted from any of the selected pages. Quads might be empty.")
+                return@withContext Result.failure(Exception("No text could be detected on the selected pages."))
+            }
             Result.success(finalResult)
         } catch (e: Exception) {
-            Log.e("PdfExtractor", "Extraction failed", e)
+            Log.e("PdfExtractor", "Extraction failed: ${e.message}", e)
             Result.failure(e)
         }
     }
