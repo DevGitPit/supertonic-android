@@ -30,6 +30,9 @@ class EbookParser(private val context: Context) {
     private val pdfFactory = PdfiumDocumentFactory(context)
     private val publicationParser = DefaultPublicationParser(context, httpClient, assetRetriever, pdfFactory)
     private val publicationOpener = PublicationOpener(publicationParser)
+    
+    // Inject the unified OCR extractor
+    private val pdfExtractor = PdfExtractorImpl(context)
 
     suspend fun openPublication(file: File): Result<Publication> = withContext(Dispatchers.IO) {
         try {
@@ -99,116 +102,11 @@ class EbookParser(private val context: Context) {
                     publication.readingOrder.firstOrNull()?.mediaType?.matches(org.readium.r2.shared.util.mediatype.MediaType.PDF) == true
 
         if (isPdf) {
-            return@withContext extractPagesPdfBox(file, pageIndices)
+            val result = pdfExtractor.extractText(file, pageIndices)
+            return@withContext result.map { cleanPdfText(it) }
         } else {
             return@withContext extractPagesReadium(publication, pageIndices, isPdf)
         }
-    }
-
-    private suspend fun extractPagesPdfBox(file: File, pageIndices: List<Int>): Result<String> = withContext(Dispatchers.IO) {
-        var document: PDDocument? = null
-        try {
-            document = PDDocument.load(file)
-            
-            val combinedText = StringBuilder()
-            for (index in pageIndices.sorted()) {
-                if (index !in 0 until document.numberOfPages) continue
-                
-                val page = document.getPage(index)
-                val pageSize = page.cropBox
-                
-                // 1. Find the best gutter position
-                val gutterX = findBestGutter(page)
-                
-                val extractor = PDFTextStripperByArea().apply { sortByPosition = true }
-                
-                if (gutterX > 0) {
-                    // 2-column layout detected
-                    // Deep header (22%) to ensure spanning titles like "SELECTIVE MEMORY" are caught
-                    val headerHeight = pageSize.height * 0.22f
-
-                    // Buffer: Start right column slightly to the left of gutter center 
-                    // to avoid clipping the first letter of the right column.
-                    val safetyBuffer = pageSize.width * 0.02f 
-                    
-                    extractor.addRegion("header", RectF(0f, 0f, pageSize.width, headerHeight))
-                    extractor.addRegion("left", RectF(0f, headerHeight, gutterX, pageSize.height))
-                    extractor.addRegion("right", RectF(gutterX - safetyBuffer,
-                        headerHeight, pageSize.width, pageSize.height))
-                    
-                    extractor.extractRegions(page)
-                    
-                    val h = extractor.getTextForRegion("header").trim()
-                    val l = extractor.getTextForRegion("left").trim()
-                    val r = extractor.getTextForRegion("right").trim()
-                    
-                    if (h.isNotEmpty()) combinedText.append(h).append("\n\n")
-                    if (l.isNotEmpty()) combinedText.append(l).append("\n\n")
-                    if (r.isNotEmpty()) combinedText.append(r).append("\n\n")
-                } else {
-                    // Standard 1-column extraction
-                    val marginY = pageSize.height * 0.08f
-                    val mainRect = RectF(0f, marginY, pageSize.width, pageSize.height - marginY)
-                    
-                    extractor.addRegion("main", mainRect)
-                    extractor.extractRegions(page)
-                    
-                    val pageText = extractor.getTextForRegion("main")
-                    if (pageText.isNotBlank()) {
-                        combinedText.append(pageText).append("\n\n")
-                    } else {
-                        val fullStripper = PDFTextStripper().apply {
-                            sortByPosition = true
-                            startPage = index + 1
-                            endPage = index + 1
-                        }
-                        combinedText.append(fullStripper.getText(document)).append("\n\n")
-                    }
-                }
-            }
-            
-            val result = combinedText.toString().trim()
-            if (result.isBlank()) {
-                return@withContext Result.failure(Exception("No text found on selected pages via PDFBox."))
-            }
-            Result.success(cleanPdfText(result))
-        } catch (e: Exception) {
-            Log.e("EbookParser", "PDFBox extraction failed", e)
-            Result.failure(e)
-        } finally {
-            try { document?.close() } catch (e: Exception) {}
-        }
-    }
-
-    private fun findBestGutter(page: com.tom_roush.pdfbox.pdmodel.PDPage): Float {
-        val pageSize = page.cropBox
-        val gutterWidth = pageSize.width * 0.015f 
-        val testStripper = PDFTextStripperByArea()
-        
-        // Scan wider range (30% to 70%) to find gutters in asymmetrical layouts
-        val scanPoints = listOf(0.30f, 0.35f, 0.40f, 0.45f, 0.50f, 0.55f, 0.60f, 0.65f, 0.70f)
-        
-        for (p in scanPoints) {
-            val x = pageSize.width * p
-            val region = RectF(x - (gutterWidth/2), pageSize.height * 0.25f, x + (gutterWidth/2), pageSize.height * 0.75f)
-            testStripper.addRegion("gutter_$p", region)
-        }
-        
-        testStripper.extractRegions(page)
-        
-        var bestX = -1f
-        var minLength = Int.MAX_VALUE
-        
-        for (p in scanPoints) {
-            val text = testStripper.getTextForRegion("gutter_$p").trim()
-            if (text.length < minLength) {
-                minLength = text.length
-                bestX = pageSize.width * p
-            }
-        }
-        
-        // Increased threshold to 20 to handle spanning titles/decorations
-        return if (minLength < 20) bestX else -1f
     }
 
     private fun cleanPdfText(text: String): String {
@@ -222,7 +120,8 @@ class EbookParser(private val context: Context) {
         
         // 3. Join single newlines into paragraphs (preserving spaces)
         // Join if line doesn't end in sentence punctuation and next char is a letter
-        cleaned = cleaned.replace(Regex("([^.!?\\-])\\s*\\r?\\n\\s*([\\p{L}])"), "$1 $2")
+        // Added Hindi punctuation: । (U+0964) and ॥ (U+0965)
+        cleaned = cleaned.replace(Regex("([^.!?\\-।॥])\\s*\\r?\\n\\s*([\\p{L}])"), "$1 $2")
 
         // 4. Remove lone page numbers on their own lines
         cleaned = cleaned.replace(Regex("(?m)^\\s*\\d+\\s*$"), "")

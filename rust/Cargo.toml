@@ -13,11 +13,16 @@ ort = { version = "2.0.0-rc.11", features = ["load-dynamic", "ndarray", "xnnpack
 
 # Array processing (like NumPy)
 ndarray = { version = "0.17.2", features = ["rayon"] }
+ndarray-stats = "0.6"
 rand = "0.8"
 rand_distr = "0.4"
 
 # Parallel processing
 rayon = "1.10"
+
+# Image processing
+image = "0.25"
+imageproc = "0.25"
 
 # Audio processing
 hound = "3.5"
