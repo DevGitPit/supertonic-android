@@ -166,8 +166,8 @@ public final class PaddleOcrEngine implements OcrEngine {
         long tInit = System.nanoTime();
 
         if (PaddleResultBuilder.ENABLE_DEBUG_DUMPS) {
-            PaddleDebugDumper.registerSample(
-                    bitmap, "img_" + Integer.toHexString(System.identityHashCode(bitmap)));
+            // PaddleDebugDumper.registerSample(
+            //        bitmap, "img_" + Integer.toHexString(System.identityHashCode(bitmap)));
         }
 
         List<Quad> quads = det.detect(bitmap, highQualityDetectionEnabled);

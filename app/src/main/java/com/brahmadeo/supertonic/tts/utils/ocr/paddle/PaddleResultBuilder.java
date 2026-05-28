@@ -100,7 +100,7 @@ final class PaddleResultBuilder {
 
         // Debug-Dumps (nur wenn aktiv und Bitmap registriert): Originalbild mit Det-Quads.
         if (ENABLE_DEBUG_DUMPS) {
-            PaddleDebugDumper.dumpOriginalWithQuads(full, effectiveQuads);
+            // PaddleDebugDumper.dumpOriginalWithQuads(full, effectiveQuads);
         }
 
         // Reading-Order via Zeilen-Gruppierung: vertikales Center-Y-Overlap mit Toleranz
@@ -217,7 +217,7 @@ final class PaddleResultBuilder {
                 (confCount == 0) ? null : Integer.valueOf((int) Math.round(confSum / confCount));
         // Debug-Dump abschließen (nur wenn aktiv und für full registriert).
         if (ENABLE_DEBUG_DUMPS) {
-            PaddleDebugDumper.finishSample(full, textBuilder.toString(), meanConf);
+            // PaddleDebugDumper.finishSample(full, textBuilder.toString(), meanConf);
         }
         return new OcrResult(textBuilder.toString(), words, (meanConf == null) ? 0.0f : meanConf.floatValue());
     }

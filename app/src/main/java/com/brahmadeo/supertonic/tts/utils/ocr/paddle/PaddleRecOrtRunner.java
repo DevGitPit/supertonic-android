@@ -534,10 +534,10 @@ class PaddleRecOrtRunner implements AutoCloseable {
 
                 int[] argmaxHead = null;
                 if (PaddleResultBuilder.ENABLE_DEBUG_DUMPS
-                        && PaddleDebugDumper.isEnabled()
+                        // && PaddleDebugDumper.isEnabled()
                         && T > 0
                         && C > 0) {
-                    int n = Math.min(T, PaddleDebugDumper.ARGMAX_HEAD_FRAMES);
+                    int n = Math.min(T, 32); // Use literal instead of PaddleDebugDumper.ARGMAX_HEAD_FRAMES
                     argmaxHead = new int[n];
                     for (int t = 0; t < n; t++) {
                         float[] row = logits[t];

@@ -10,7 +10,6 @@
 package com.brahmadeo.supertonic.tts.utils.ocr;
 
 import java.util.Locale;
-import lombok.experimental.UtilityClass;
 
 /**
  * A utility class providing methods for optimal OCR language selection and handling of supported
@@ -20,8 +19,9 @@ import lombok.experimental.UtilityClass;
  *
  * <p>This class is not intended to be instantiated.
  */
-@UtilityClass
-public class OCRUtils {
+public final class OCRUtils {
+
+  private OCRUtils() {}
 
   private static final String TAG = "OCRUtils";
 

@@ -10,24 +10,19 @@
 package com.brahmadeo.supertonic.tts.utils.ocr;
 
 import android.graphics.RectF;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
 
 /**
  * Represents a single word that has been recognized, typically in the context of image or text
  * analysis. Each recognized word contains the text, a bounding box specifying its location and
  * size, and a confidence level indicating the likelihood of its correctness.
  */
-@Getter
-@ToString(of = {"text", "boundingBox", "confidence"})
 public class RecognizedWord {
 
   /**
    * The recognized textual content. Represents the text detected and recognized in an image or
    * document. This variable stores the value of the recognized word or phrase.
    */
-  @Setter private String text;
+  private String text;
 
   /**
    * The bounding box of the recognized word, represented as a normalized rectangle. The coordinates
@@ -48,13 +43,13 @@ public class RecognizedWord {
   private final float confidence;
 
   /** Optional language code for this word (e.g., "eng", "deu"). May be null if not specified. */
-  @Setter private String lang;
+  private String lang;
 
   /** Layout block/region index (0 = unassigned). Set by layout-aware OCR pipeline. */
-  @Setter private int blockId;
+  private int blockId;
 
   /** Layout line index within block (0 = unassigned). Set by layout-aware OCR pipeline. */
-  @Setter private int lineId;
+  private int lineId;
 
   /**
    * Constructs a new {@code RecognizedWord} instance with the given text, bounding box, and
@@ -89,6 +84,42 @@ public class RecognizedWord {
     this.lang = lang;
   }
 
+  public String getText() {
+    return text;
+  }
+
+  public void setText(String text) {
+    this.text = text;
+  }
+
+  public float getConfidence() {
+    return confidence;
+  }
+
+  public String getLang() {
+    return lang;
+  }
+
+  public void setLang(String lang) {
+    this.lang = lang;
+  }
+
+  public int getBlockId() {
+    return blockId;
+  }
+
+  public void setBlockId(int blockId) {
+    this.blockId = blockId;
+  }
+
+  public int getLineId() {
+    return lineId;
+  }
+
+  public void setLineId(int lineId) {
+    this.lineId = lineId;
+  }
+
   /**
    * Retrieves the bounding box of the recognized text.
    *
@@ -96,6 +127,11 @@ public class RecognizedWord {
    */
   public RectF getBoundingBox() {
     return new RectF(boundingBox);
+  }
+
+  @Override
+  public String toString() {
+    return "RecognizedWord(text=" + text + ", boundingBox=" + boundingBox + ", confidence=" + confidence + ")";
   }
 
   /**
