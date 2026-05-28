@@ -1,13 +1,13 @@
 package com.brahmadeo.supertonic.tts.ui
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
@@ -18,8 +18,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.brahmadeo.supertonic.tts.ui.components.IndeterminateWavyProgressIndicator
 import com.brahmadeo.supertonic.tts.ui.components.WavyCircularProgressIndicator
 import com.brahmadeo.supertonic.tts.ui.components.WavyLinearProgressIndicator
@@ -74,11 +76,11 @@ fun PlaybackScreen(
                 state = listState,
                 contentPadding = PaddingValues(
                     top = 16.dp,
-                    start = 16.dp,
-                    end = 16.dp,
+                    start = 8.dp,
+                    end = 8.dp,
                     bottom = 140.dp
                 ),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 itemsIndexed(sentences) { index, sentence ->
@@ -252,26 +254,25 @@ fun SentenceItem(
     isActive: Boolean,
     onClick: () -> Unit
 ) {
-    val containerColor by animateColorAsState(
-        if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.surface
+    val backgroundColor by animateColorAsState(
+        if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) 
+        else Color.Transparent,
+        label = "backgroundColor"
     )
     val contentColor by animateColorAsState(
-        if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+        if (isActive) MaterialTheme.colorScheme.onSurface 
+        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+        label = "contentColor"
     )
 
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = containerColor,
-            contentColor = contentColor
-        ),
-        border = if (isActive) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-        shape = MaterialTheme.shapes.medium,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
+            .background(backgroundColor, MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
+            .padding(vertical = 8.dp, horizontal = 12.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (isActive) {
@@ -279,13 +280,19 @@ fun SentenceItem(
                     modifier = Modifier
                         .width(4.dp)
                         .height(24.dp)
-                        .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.extraSmall)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
+            } else {
+                Spacer(modifier = Modifier.width(16.dp))
             }
             Text(
                 text = text,
-                style = if (isActive) MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold) else MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                    lineHeight = 28.sp
+                ),
+                color = contentColor,
                 modifier = Modifier.weight(1f)
             )
         }

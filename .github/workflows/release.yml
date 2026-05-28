@@ -94,23 +94,32 @@ jobs:
         env:
           BUILD_TOOLS_VERSION: "35.0.0"
 
+      - name: Set Asset Name
+        run: |
+          CLEAN_NAME=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
+          if [[ "${{ github.ref_type }}" == "tag" || "${{ github.ref_name }}" == "main" ]]; then
+            echo "ASSET_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+          else
+            echo "ASSET_NAME=${CLEAN_NAME}" >> $GITHUB_ENV
+          fi
+
       - name: Rename Signed Assets
         run: |
-          mv ${{ steps.sign_apk.outputs.signedReleaseFile }} app/build/outputs/apk/release/Supertonic-${{ github.ref_name }}.apk
-          mv ${{ steps.sign_bundle.outputs.signedReleaseFile }} app/build/outputs/bundle/release/Supertonic-${{ github.ref_name }}.aab
+          mv ${{ steps.sign_apk.outputs.signedReleaseFile }} app/build/outputs/apk/release/Supertonic-${{ env.ASSET_NAME }}.apk
+          mv ${{ steps.sign_bundle.outputs.signedReleaseFile }} app/build/outputs/bundle/release/Supertonic-${{ env.ASSET_NAME }}.aab
 
       - name: Upload Test Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Supertonic-Build-${{ github.ref_name }}
+          name: Supertonic-Build-${{ env.ASSET_NAME }}
           path: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/apk/release/Supertonic-${{ env.ASSET_NAME }}.apk
+            app/build/outputs/bundle/release/Supertonic-${{ env.ASSET_NAME }}.aab
 
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            app/build/outputs/apk/release/Supertonic-${{ github.ref_name }}.apk
-            app/build/outputs/bundle/release/Supertonic-${{ github.ref_name }}.aab
+            app/build/outputs/apk/release/Supertonic-${{ env.ASSET_NAME }}.apk
+            app/build/outputs/bundle/release/Supertonic-${{ env.ASSET_NAME }}.aab
