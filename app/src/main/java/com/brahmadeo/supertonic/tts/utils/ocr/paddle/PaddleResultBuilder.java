@@ -237,7 +237,7 @@ final class PaddleResultBuilder {
 
             // Debug-Dump pro Crop (nur wenn aktiv).
             if (ENABLE_DEBUG_DUMPS) {
-                PaddleDebugDumper.dumpCrop(full, globalCropIndex.getAndIncrement(), q, crop, out);
+                // PaddleDebugDumper.dumpCrop(full, globalCropIndex.getAndIncrement(), q, crop, out);
             }
 
             // Space-/Token-Rekonstruktion: Recognition liefert keine Spaces.
