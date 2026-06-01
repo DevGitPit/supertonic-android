@@ -266,10 +266,10 @@ class EbookOutlineActivity : ComponentActivity() {
             val flatLinks = links.flatten()
             
             // Load cached word counts first
-            val cachedCounts = EbookManager.getWordCounts(this@EbookOutlineActivity, ebookFile.absolutePath)
-            withContext(Dispatchers.Main) {
-                wordCounts.putAll(cachedCounts)
+            val cachedCounts = withContext(Dispatchers.IO) {
+                EbookManager.getWordCounts(this@EbookOutlineActivity, ebookFile.absolutePath)
             }
+            wordCounts.putAll(cachedCounts)
             
             // Extract missing word counts gradually/sequentially
             for (link in flatLinks) {
@@ -292,14 +292,14 @@ class EbookOutlineActivity : ComponentActivity() {
                         
                         withContext(Dispatchers.Main) {
                             wordCounts[hrefStr] = words
-                            EbookManager.saveWordCount(this@EbookOutlineActivity, ebookFile.absolutePath, hrefStr, words)
                         }
+                        EbookManager.saveWordCount(this@EbookOutlineActivity, ebookFile.absolutePath, hrefStr, words)
                     } catch (e: Exception) {
                         e.printStackTrace()
                         withContext(Dispatchers.Main) {
                             wordCounts[hrefStr] = 0
-                            EbookManager.saveWordCount(this@EbookOutlineActivity, ebookFile.absolutePath, hrefStr, 0)
                         }
+                        EbookManager.saveWordCount(this@EbookOutlineActivity, ebookFile.absolutePath, hrefStr, 0)
                     }
                 }
             }
@@ -310,12 +310,13 @@ class EbookOutlineActivity : ComponentActivity() {
 
         val flatUiList = remember(links) {
             val result = mutableListOf<Pair<Link, Int>>()
-            for (link in links) {
-                result.add(Pair(link, 0))
-                for (child in link.children) {
-                    result.add(Pair(child, 1))
+            fun traverse(list: List<Link>, level: Int) {
+                for (link in list) {
+                    result.add(Pair(link, level))
+                    traverse(link.children, level + 1)
                 }
             }
+            traverse(links, 0)
             result
         }
 

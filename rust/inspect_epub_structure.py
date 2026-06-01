@@ -1,12 +1,17 @@
 import zipfile
 import xml.etree.ElementTree as ET
 import os
+import sys
 
-epub_path = r"C:\Users\panka\Downloads\09. THE GOD OF THE WOODS by Liz Moore.epub"
+if len(sys.argv) < 2:
+    print("Usage: python inspect_epub_structure.py <path_to_epub>")
+    sys.exit(1)
+
+epub_path = sys.argv[1]
 
 if not os.path.exists(epub_path):
     print(f"File not found: {epub_path}")
-    exit(1)
+    sys.exit(1)
 
 with zipfile.ZipFile(epub_path, 'r') as z:
     # 1. Find container.xml to locate OPF
@@ -70,16 +75,30 @@ with zipfile.ZipFile(epub_path, 'r') as z:
             if toc_root.tag.startswith("{"):
                 ns_ncx = toc_root.tag.split("}")[0] + "}"
             
-            # Print TOC points
+            # Print TOC points recursively with indentation levels
             print("\nTOC entries:")
-            nav_points = toc_root.findall(f".//{ns_ncx}navPoint")
-            print(f"Found {len(nav_points)} navPoints in NCX")
-            for i, nav in enumerate(nav_points):
-                label_el = nav.find(f".//{ns_ncx}text")
-                content_el = nav.find(f".//{ns_ncx}content")
-                label = label_el.text if label_el is not None else "No Label"
-                src = content_el.attrib.get("src") if content_el is not None else "No Src"
-                print(f"  TOC[{i}]: Label='{label}', Src='{src}'")
+            nav_map = toc_root.find(f".//{ns_ncx}navMap")
+            if nav_map is not None:
+                def print_nav_points(element, level):
+                    for child in element:
+                        if child.tag == f"{ns_ncx}navPoint":
+                            label_el = child.find(f"{ns_ncx}navLabel/{ns_ncx}text")
+                            content_el = child.find(f"{ns_ncx}content")
+                            label = label_el.text if label_el is not None else "No Label"
+                            src = content_el.attrib.get("src") if content_el is not None else "No Src"
+                            indent = "  " * level
+                            print(f"{indent}- Label='{label}', Src='{src}'")
+                            print_nav_points(child, level + 1)
+                print_nav_points(nav_map, 0)
+            else:
+                nav_points = toc_root.findall(f".//{ns_ncx}navPoint")
+                print(f"Found {len(nav_points)} navPoints in NCX")
+                for i, nav in enumerate(nav_points):
+                    label_el = nav.find(f".//{ns_ncx}text")
+                    content_el = nav.find(f".//{ns_ncx}content")
+                    label = label_el.text if label_el is not None else "No Label"
+                    src = content_el.attrib.get("src") if content_el is not None else "No Src"
+                    print(f"  TOC[{i}]: Label='{label}', Src='{src}'")
         else:
             print("TOC file not found in zip.")
     else:
