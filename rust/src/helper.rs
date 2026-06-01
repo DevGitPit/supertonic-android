@@ -254,10 +254,44 @@ pub fn chunk_text(text: &str, lang: &str, max_len: Option<usize>) -> Vec<String>
     // Split by paragraphs
     static PARA_RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     let para_re = PARA_RE.get_or_init(|| Regex::new(r"\n\s*\n").unwrap());
-    let paragraphs: Vec<&str> = para_re.split(text).collect();
+    let paragraphs_raw: Vec<&str> = para_re.split(text).collect();
+    let mut paragraphs = Vec::new();
+    let mut current_para = String::new();
+
+    for para in paragraphs_raw {
+        let p = para.trim();
+        if p.is_empty() {
+            continue;
+        }
+
+        if !current_para.is_empty() {
+            if current_para.len() + p.len() + 2 > max_len || p.len() >= 80 {
+                paragraphs.push(current_para.clone());
+                current_para.clear();
+            } else {
+                let ends_with_punc = current_para.ends_with('.') || current_para.ends_with('!') || current_para.ends_with('?') || current_para.ends_with('।');
+                if !ends_with_punc {
+                    current_para.push_str(" .");
+                }
+                current_para.push(' ');
+                current_para.push_str(p);
+                continue;
+            }
+        }
+
+        if p.len() < 80 {
+            current_para.push_str(p);
+        } else {
+            paragraphs.push(p.to_string());
+        }
+    }
+    if !current_para.is_empty() {
+        paragraphs.push(current_para);
+    }
+
     let mut chunks = Vec::new();
 
-    for para in paragraphs {
+    for para in &paragraphs {
         let para = para.trim();
         if para.is_empty() {
             continue;
@@ -968,6 +1002,20 @@ mod tests {
         assert_eq!(sentences[0].trim(), "पहला पड़ाव था- UAE।");
         assert_eq!(sentences[1].trim(), "मोदी यहां करीब 3 घंटे रुके।");
         assert_eq!(sentences[2].trim(), "राष्ट्रपति शेख मोहम्मद बिन जायद से मुलाकात की।");
+    }
+
+    #[test]
+    fn test_english_chapter_chunking() {
+        let file_path = "../app/src/test/resources/part1_text.txt";
+        let text = std::fs::read_to_string(file_path).expect("Failed to read part1_text.txt");
+        let start = std::time::Instant::now();
+        let chunks = chunk_text(&text, "en", None);
+        let duration = start.elapsed();
+        println!("Rust Chunked {} chars into {} chunks in {:?}", text.len(), chunks.len(), duration);
+        assert!(!chunks.is_empty());
+        for (i, chunk) in chunks.iter().enumerate().take(5) {
+            println!("Rust Chunk {}: {}", i, chunk);
+        }
     }
 }
 

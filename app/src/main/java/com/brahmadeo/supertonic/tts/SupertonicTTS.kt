@@ -248,20 +248,49 @@ object SupertonicTTS {
             }
         }
         
-        // Basic paragraph split as a high-level wrapper
-        // If there are multiple paragraphs, split them first
-        val paragraphs = trimmed.split(PARAGRAPH_REGEX)
+        // Chunking sentence grouping up to maxChunkLen (300 or 120)
+        val maxChunkLen = when {
+            normalizedLang.startsWith("ja") || normalizedLang.startsWith("ko") -> 120
+            else -> 300
+        }
+
+        val rawParagraphs = trimmed.split(PARAGRAPH_REGEX)
+        val paragraphs = mutableListOf<String>()
+        val currentPara = StringBuilder()
+        
+        for (para in rawParagraphs) {
+            val p = para.trim()
+            if (p.isEmpty()) continue
+            
+            if (currentPara.isNotEmpty()) {
+                if (currentPara.length + p.length + 2 > maxChunkLen || p.length >= 80) {
+                    paragraphs.add(currentPara.toString())
+                    currentPara.clear()
+                } else {
+                    val lastChar = currentPara.last()
+                    if (lastChar != '.' && lastChar != '!' && lastChar != '?' && lastChar != '।') {
+                        currentPara.append(" .")
+                    }
+                    currentPara.append(" ").append(p)
+                    continue
+                }
+            }
+            
+            if (p.length < 80) {
+                currentPara.append(p)
+            } else {
+                paragraphs.add(p)
+            }
+        }
+        if (currentPara.isNotEmpty()) {
+            paragraphs.add(currentPara.toString())
+        }
+        
         if (paragraphs.size > 1) {
             return paragraphs.flatMap { para -> 
                 val subJoined = fallbackChunkText(para, lang)
                 if (subJoined.isEmpty()) emptyList() else subJoined.split("\u001E")
             }.filter { it.isNotEmpty() }.joinToString("\u001E")
-        }
-        
-        // Chunking sentence grouping up to maxChunkLen (300 or 120)
-        val maxChunkLen = when {
-            normalizedLang.startsWith("ja") || normalizedLang.startsWith("ko") -> 120
-            else -> 300
         }
         
         val chunked = mutableListOf<String>()

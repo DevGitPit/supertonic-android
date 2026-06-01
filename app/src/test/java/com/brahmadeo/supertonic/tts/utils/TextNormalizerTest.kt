@@ -135,4 +135,49 @@ class TextNormalizerTest {
         // Devanagari digits
         assertEquals("तिरेपन दशमलव तीन", normalizer.normalize("५३.३", "hi"))
     }
+
+    @Test
+    fun testGodOfWoodsPart1Chunking() {
+        val file = java.io.File("src/test/resources/part1_text.txt")
+        assert(file.exists()) { "part1_text.txt does not exist at ${file.absolutePath}" }
+        val text = file.readText(Charsets.UTF_8)
+        val normalizer = TextNormalizer()
+        
+        val startTime = System.currentTimeMillis()
+        val chunks = normalizer.splitIntoSentences(text, "en")
+        val endTime = System.currentTimeMillis()
+        
+        println("Chunked ${text.length} chars into ${chunks.size} chunks in ${endTime - startTime} ms")
+        assert(chunks.isNotEmpty())
+        for (i in 0 until minOf(10, chunks.size)) {
+            println("Chunk $i: ${chunks[i]}")
+        }
+    }
+
+    @Test
+    fun testGodOfWoodsPart1Normalization() {
+        val file = java.io.File("src/test/resources/part1_text.txt")
+        assert(file.exists())
+        val text = file.readText(Charsets.UTF_8)
+        val normalizer = TextNormalizer()
+        val chunks = normalizer.splitIntoSentences(text, "en")
+        
+        println("Normalizing ${chunks.size} chunks...")
+        val startTime = System.currentTimeMillis()
+        for (i in chunks.indices) {
+            val chunk = chunks[i]
+            try {
+                val normalized = normalizer.normalize(chunk, "en", isAdvancedEnabled = true)
+                // Just a basic check
+                if (i < 5) {
+                    println("Chunk $i normalized: $normalized")
+                }
+            } catch (e: Exception) {
+                println("Failed on chunk $i: '$chunk'")
+                throw e
+            }
+        }
+        val endTime = System.currentTimeMillis()
+        println("Normalized ${chunks.size} chunks in ${endTime - startTime} ms")
+    }
 }

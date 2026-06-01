@@ -48,23 +48,39 @@ class EbookParser(private val context: Context) {
         }
     }
 
-    suspend fun extractText(publication: Publication, link: Link? = null): Result<String> = withContext(Dispatchers.IO) {
+    private fun List<Link>.flatten(): List<Link> {
+        val result = mutableListOf<Link>()
+        fun traverse(links: List<Link>) {
+            for (link in links) {
+                result.add(link)
+                traverse(link.children)
+            }
+        }
+        traverse(this)
+        return result
+    }
+
+    private suspend fun extractSingleLinkText(
+        publication: Publication,
+        linkToExtract: Link,
+        startLocator: Locator? = null
+    ): String {
         try {
-            val startUrl = link?.url()?.toString()
-            val startPath = startUrl?.substringBefore('#')
-            
-            val locator = link?.let { Locator(href = it.url(), mediaType = it.mediaType ?: org.readium.r2.shared.util.mediatype.MediaType.BINARY) }
+            val locator = startLocator ?: Locator(
+                href = linkToExtract.url(),
+                mediaType = linkToExtract.mediaType ?: org.readium.r2.shared.util.mediatype.MediaType.BINARY
+            )
             val content = publication.content(locator)
-            
             if (content != null) {
                 val chapterText = StringBuilder()
                 val elements = content.elements()
+                val targetPath = linkToExtract.url().toString().substringBefore('#')
 
                 for (element in elements) {
                     val elementUrl = element.locator.href.toString()
                     val elementPath = elementUrl.substringBefore('#')
                     
-                    if (startPath != null && elementPath != startPath) {
+                    if (elementPath != targetPath) {
                         break
                     }
                     
@@ -72,15 +88,100 @@ class EbookParser(private val context: Context) {
                         element.text?.let { if (it.isNotBlank()) chapterText.append(it).append("\n\n") }
                     }
                 }
-                
                 val result = chapterText.toString().trim()
-                if (result.isNotBlank()) return@withContext Result.success(result)
+                if (result.isNotBlank()) {
+                    return result
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("EbookParser", "Failed to extract via Content service for ${linkToExtract.href}: ${e.message}")
+        }
+        
+        // Fallback
+        return extractFallback(publication, linkToExtract)
+    }
+
+    suspend fun extractText(publication: Publication, link: Link? = null): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            if (link == null) {
+                // If link is null, extract everything in readingOrder
+                val fullText = StringBuilder()
+                for (readingLink in publication.readingOrder) {
+                    val text = extractSingleLinkText(publication, readingLink)
+                    if (text.isNotBlank()) {
+                        fullText.append(text).append("\n\n")
+                    }
+                }
+                val result = fullText.toString().trim()
+                return@withContext if (result.isNotBlank()) {
+                    Result.success(result)
+                } else {
+                    Result.failure(Exception("No text content could be extracted."))
+                }
             }
 
-            val fallbackText = extractFallback(publication, link)
-            if (fallbackText.isNotBlank()) return@withContext Result.success(fallbackText)
+            val startPath = link.url().toString().substringBefore('#')
+            val spineStartIndex = publication.readingOrder.indexOfFirst {
+                it.url().toString().substringBefore('#') == startPath
+            }
 
-            Result.failure(Exception("No text content could be extracted."))
+            if (spineStartIndex == -1) {
+                // Not in spine, extract only this link
+                val text = extractSingleLinkText(publication, link)
+                return@withContext if (text.isNotBlank()) {
+                    Result.success(text)
+                } else {
+                    Result.failure(Exception("No text content could be extracted."))
+                }
+            }
+
+            // Find spineEndIndex based on the next TOC item pointing to a different spine file
+            var spineEndIndex = publication.readingOrder.size
+            val flatToc = publication.tableOfContents.flatten()
+            val currentTocIndex = flatToc.indexOfFirst {
+                it.url().toString().substringBefore('#') == startPath
+            }
+            if (currentTocIndex != -1) {
+                for (j in (currentTocIndex + 1) until flatToc.size) {
+                    val nextPath = flatToc[j].url().toString().substringBefore('#')
+                    if (nextPath != startPath) {
+                        val nextSpineIndex = publication.readingOrder.indexOfFirst {
+                            it.url().toString().substringBefore('#') == nextPath
+                        }
+                        if (nextSpineIndex != -1 && nextSpineIndex > spineStartIndex) {
+                            spineEndIndex = nextSpineIndex
+                            break
+                        }
+                    }
+                }
+            }
+
+            // Extract all spine items in the range [spineStartIndex, spineEndIndex)
+            val combinedText = StringBuilder()
+            for (i in spineStartIndex until spineEndIndex) {
+                val spineLink = publication.readingOrder[i]
+                val text = if (i == spineStartIndex) {
+                    // For the first one, preserve the locator if fragment is present
+                    val startLocator = Locator(
+                        href = link.url(),
+                        mediaType = link.mediaType ?: org.readium.r2.shared.util.mediatype.MediaType.BINARY
+                    )
+                    extractSingleLinkText(publication, spineLink, startLocator)
+                } else {
+                    extractSingleLinkText(publication, spineLink)
+                }
+                
+                if (text.isNotBlank()) {
+                    combinedText.append(text).append("\n\n")
+                }
+            }
+
+            val result = combinedText.toString().trim()
+            if (result.isNotBlank()) {
+                Result.success(result)
+            } else {
+                Result.failure(Exception("No text content could be extracted."))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

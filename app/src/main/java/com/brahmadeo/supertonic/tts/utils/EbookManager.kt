@@ -77,6 +77,8 @@ object EbookManager {
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit {
                     putString(KEY_RECENT_BOOKS, jsonArray.toString())
+                    remove("last_read_$path")
+                    remove("word_counts_$path")
                 }
 
             // Also, if the file resides inside our private app directory, delete it.
@@ -132,6 +134,59 @@ object EbookManager {
         } catch (e: Exception) {
             e.printStackTrace()
             return null
+        }
+    }
+
+    fun setLastReadChapter(context: Context, bookPath: String, chapterHref: String) {
+        try {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit {
+                putString("last_read_$bookPath", chapterHref)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun getLastReadChapter(context: Context, bookPath: String): String? {
+        return try {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.getString("last_read_$bookPath", null)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    fun getWordCounts(context: Context, bookPath: String): Map<String, Int> {
+        return try {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val jsonStr = prefs.getString("word_counts_$bookPath", "{}") ?: "{}"
+            val jsonObj = JSONObject(jsonStr)
+            val result = mutableMapOf<String, Int>()
+            val keys = jsonObj.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                result[key] = jsonObj.getInt(key)
+            }
+            result
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyMap()
+        }
+    }
+
+    fun saveWordCount(context: Context, bookPath: String, chapterHref: String, wordCount: Int) {
+        try {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val jsonStr = prefs.getString("word_counts_$bookPath", "{}") ?: "{}"
+            val jsonObj = JSONObject(jsonStr)
+            jsonObj.put(chapterHref, wordCount)
+            prefs.edit {
+                putString("word_counts_$bookPath", jsonObj.toString())
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }

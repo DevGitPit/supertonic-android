@@ -6,8 +6,8 @@ import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,7 +30,8 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -46,9 +47,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -57,6 +58,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -64,18 +66,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.core.graphics.createBitmap
+import androidx.lifecycle.lifecycleScope
 import com.brahmadeo.supertonic.tts.ui.theme.SupertonicTheme
 import com.brahmadeo.supertonic.tts.utils.EbookManager
 import com.brahmadeo.supertonic.tts.utils.EbookParser
-import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.readium.r2.shared.publication.Link
@@ -84,7 +90,6 @@ import org.readium.r2.shared.publication.services.positions
 import org.readium.r2.shared.util.mediatype.MediaType
 import java.io.File
 import kotlin.math.max
-import androidx.core.graphics.createBitmap
 
 class EbookOutlineActivity : ComponentActivity() {
 
@@ -132,8 +137,10 @@ class EbookOutlineActivity : ComponentActivity() {
         var selectedTabIndex by remember { mutableIntStateOf(0) }
         
         var isPdf by remember { mutableStateOf(ebookFile.extension.lowercase() == "pdf") }
+        var lastReadChapterHref by remember { mutableStateOf<String?>(null) }
 
         LaunchedEffect(ebookFile) {
+            lastReadChapterHref = EbookManager.getLastReadChapter(this@EbookOutlineActivity, ebookFile.absolutePath)
             val result = ebookParser.openPublication(ebookFile)
             publication = result.getOrNull()
             isLoading = false
@@ -189,15 +196,28 @@ class EbookOutlineActivity : ComponentActivity() {
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 } else if (publication != null) {
-                    when (selectedTabIndex) {
-                        0 -> ChapterTab(publication!!, onTextExtracted) { isExtracting = it }
-                        1 -> PagesTab(ebookFile, publication!!, isPdf, onTextExtracted) { isExtracting = it }
+                    val contentAlpha = if (isExtracting) 0.4f else 1.0f
+                    Box(modifier = Modifier.fillMaxSize().graphicsLayer(alpha = contentAlpha)) {
+                        when (selectedTabIndex) {
+                             0 -> ChapterTab(
+                                ebookFile = ebookFile,
+                                publication = publication!!,
+                                onTextExtracted = onTextExtracted,
+                                lastReadChapterHref = lastReadChapterHref,
+                                onLastReadChapterUpdated = { href ->
+                                    lastReadChapterHref = href
+                                    EbookManager.setLastReadChapter(this@EbookOutlineActivity, ebookFile.absolutePath, href)
+                                },
+                                setExtracting = { isExtracting = it }
+                            )
+                            1 -> PagesTab(ebookFile, publication!!, isPdf, onTextExtracted) { isExtracting = it }
+                        }
                     }
                 }
 
                 if (isExtracting) {
                     Surface(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().clickable(enabled = false) {},
                         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
                     ) {
                         Column(
@@ -215,21 +235,124 @@ class EbookOutlineActivity : ComponentActivity() {
         }
     }
 
+    private fun List<Link>.flatten(): List<Link> {
+        val result = mutableListOf<Link>()
+        fun traverse(links: List<Link>) {
+            for (link in links) {
+                result.add(link)
+                traverse(link.children)
+            }
+        }
+        traverse(this)
+        return result
+    }
+
     @Composable
     fun ChapterTab(
+        ebookFile: File,
         publication: Publication,
         onTextExtracted: (String) -> Unit,
+        lastReadChapterHref: String?,
+        onLastReadChapterUpdated: (String) -> Unit,
         setExtracting: (Boolean) -> Unit
     ) {
         val toc = publication.tableOfContents
         val links = toc.ifEmpty { publication.readingOrder }
         
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
-            items(links) { link ->
-                ChapterItem(link, publication, onTextExtracted, setExtracting)
-                link.children.forEach { child ->
-                    ChapterItem(child, publication, onTextExtracted, setExtracting, level = 1)
+        val wordCounts = remember { mutableStateMapOf<String, Int>() }
+        var currentlyCalculatingHref by remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+        
+        LaunchedEffect(publication) {
+            val flatLinks = links.flatten()
+            
+            // Load cached word counts first
+            val cachedCounts = EbookManager.getWordCounts(this@EbookOutlineActivity, ebookFile.absolutePath)
+            withContext(Dispatchers.Main) {
+                wordCounts.putAll(cachedCounts)
+            }
+            
+            // Extract missing word counts gradually/sequentially
+            for (link in flatLinks) {
+                if (!isActive) break
+                val hrefStr = link.href.toString()
+                if (wordCounts.containsKey(hrefStr)) {
+                    continue
                 }
+                
+                withContext(Dispatchers.Main) {
+                    currentlyCalculatingHref = hrefStr
+                }
+                
+                withContext(Dispatchers.IO) {
+                    try {
+                        val result = ebookParser.extractText(publication, link)
+                        val words = result.getOrNull()?.let { text ->
+                            text.split(Regex("\\s+")).filter { it.isNotBlank() }.size
+                        } ?: 0
+                        
+                        withContext(Dispatchers.Main) {
+                            wordCounts[hrefStr] = words
+                            EbookManager.saveWordCount(this@EbookOutlineActivity, ebookFile.absolutePath, hrefStr, words)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        withContext(Dispatchers.Main) {
+                            wordCounts[hrefStr] = 0
+                            EbookManager.saveWordCount(this@EbookOutlineActivity, ebookFile.absolutePath, hrefStr, 0)
+                        }
+                    }
+                }
+            }
+            withContext(Dispatchers.Main) {
+                currentlyCalculatingHref = null
+            }
+        }
+
+        val flatUiList = remember(links) {
+            val result = mutableListOf<Pair<Link, Int>>()
+            for (link in links) {
+                result.add(Pair(link, 0))
+                for (child in link.children) {
+                    result.add(Pair(child, 1))
+                }
+            }
+            result
+        }
+
+        val lastReadIndex = remember(flatUiList, lastReadChapterHref) {
+            flatUiList.indexOfFirst { it.first.href.toString() == lastReadChapterHref }
+        }
+
+        val listState = rememberLazyListState()
+
+        LaunchedEffect(lastReadIndex) {
+            if (lastReadIndex != -1) {
+                listState.scrollToItem(lastReadIndex)
+            }
+        }
+        
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            itemsIndexed(flatUiList) { index, pair ->
+                val link = pair.first
+                val level = pair.second
+                val isDimmed = lastReadIndex != -1 && index <= lastReadIndex
+                
+                ChapterItem(
+                    link = link,
+                    publication = publication,
+                    onTextExtracted = onTextExtracted,
+                    setExtracting = setExtracting,
+                    wordCount = wordCounts[link.href.toString()],
+                    isCalculating = (currentlyCalculatingHref == link.href.toString()),
+                    isDimmed = isDimmed,
+                    level = level,
+                    onSuccessExtraction = {
+                        onLastReadChapterUpdated(link.href.toString())
+                    }
+                )
             }
         }
     }
@@ -240,8 +363,13 @@ class EbookOutlineActivity : ComponentActivity() {
         publication: Publication,
         onTextExtracted: (String) -> Unit,
         setExtracting: (Boolean) -> Unit,
-        level: Int = 0
+        wordCount: Int?,
+        isCalculating: Boolean,
+        isDimmed: Boolean,
+        level: Int = 0,
+        onSuccessExtraction: () -> Unit
     ) {
+        val focusManager = LocalFocusManager.current
         ListItem(
             headlineContent = { 
                 Text(
@@ -251,15 +379,35 @@ class EbookOutlineActivity : ComponentActivity() {
                     modifier = Modifier.padding(start = (level * 16).dp)
                 ) 
             },
-            modifier = Modifier.clickable {
-                setExtracting(true)
-                lifecycleScope.launch {
-                    val result = ebookParser.extractText(publication, link)
-                    setExtracting(false)
-                    result.onSuccess { onTextExtracted(it) }
-                        .onFailure { Toast.makeText(this@EbookOutlineActivity, it.message, Toast.LENGTH_SHORT).show() }
+            trailingContent = {
+                if (wordCount != null) {
+                    Text(
+                        text = String.format(java.util.Locale.US, "%,d words", wordCount),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else if (isCalculating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
                 }
-            }
+            },
+            modifier = Modifier
+                .graphicsLayer(alpha = if (isDimmed) 0.5f else 1.0f)
+                .clickable {
+                    focusManager.clearFocus()
+                    setExtracting(true)
+                    lifecycleScope.launch {
+                        val result = ebookParser.extractText(publication, link)
+                        setExtracting(false)
+                        result.onSuccess {
+                            onSuccessExtraction()
+                            onTextExtracted(it)
+                        }
+                        .onFailure { Toast.makeText(this@EbookOutlineActivity, it.message, Toast.LENGTH_SHORT).show() }
+                    }
+                }
         )
     }
 

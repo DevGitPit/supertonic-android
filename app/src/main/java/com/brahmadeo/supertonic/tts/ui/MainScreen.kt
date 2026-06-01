@@ -249,14 +249,14 @@ fun MainScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .then(
-                                    if (isTextExpanded) Modifier.heightIn(min = 200.dp)
+                                    if (isTextExpanded) Modifier.heightIn(min = 200.dp, max = 320.dp)
                                     else Modifier.heightIn(max = 130.dp)
                                 )
                                 .onFocusChanged {
                                     isFocused = it.isFocused
                                     if (it.isFocused) isTextExpanded = true
                                 },
-                            maxLines = if (isTextExpanded) 100 else 5,
+                            maxLines = if (isTextExpanded) 30 else 5,
                             shape = MaterialTheme.shapes.large
                         )
                     }
