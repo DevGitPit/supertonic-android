@@ -114,6 +114,14 @@ class MainActivity : ComponentActivity() {
             }
         }
         override fun onExportComplete(success: Boolean, path: String) { }
+        override fun onChapterChanged(newText: String, chapterHref: String?, pageIndex: Int) {
+            runOnUiThread {
+                if (newText.isNotEmpty()) {
+                    viewModel.miniPlayerTitle.value = newText
+                }
+            }
+        }
+        override fun onTransitioningChanged(isTransitioning: Boolean) { }
     }
 
     private val connection = object : ServiceConnection {
@@ -562,6 +570,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+        val lastText = prefs.getString("last_text", null)
+        if (prefs.getBoolean("sleep_timer_stopped", false) && !lastText.isNullOrEmpty()) {
+            prefs.edit().putBoolean("sleep_timer_stopped", false).apply()
+            val intent = Intent(this, PlaybackActivity::class.java).apply {
+                putExtra("is_resume", true)
+            }
+            startActivity(intent)
+            return
+        }
         checkResumeState()
     }
 

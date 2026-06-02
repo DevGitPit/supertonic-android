@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.IBinder
 import android.os.RemoteException
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -43,6 +44,9 @@ import androidx.lifecycle.lifecycleScope
 import com.brahmadeo.supertonic.tts.utils.EbookManager
 import com.brahmadeo.supertonic.tts.utils.EbookParser
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import org.readium.r2.shared.publication.services.positions
 
 class PlaybackActivity : ComponentActivity() {
@@ -58,6 +62,7 @@ class PlaybackActivity : ComponentActivity() {
     private var isExportingState = mutableStateOf(false)
     private var exportCurrentState = mutableIntStateOf(0)
     private var exportTotalState = mutableIntStateOf(0)
+    private val sleepTimerSecondsState = mutableIntStateOf(0)
 
     // State persistence
     private var currentText = ""
@@ -100,9 +105,6 @@ class PlaybackActivity : ComponentActivity() {
                     updateIndexState(current)
                     if (total > 0 && current !in 0 until total) {
                         clearState()
-                        if (current >= total) {
-                            handlePlaybackCompleted()
-                        }
                     }
                 }
             }
@@ -124,6 +126,22 @@ class PlaybackActivity : ComponentActivity() {
                 } else {
                     Toast.makeText(this@PlaybackActivity, getString(R.string.export_failed), Toast.LENGTH_SHORT).show()
                 }
+            }
+        }
+
+        override fun onChapterChanged(newText: String, chapterHref: String?, pageIndex: Int) {
+            runOnUiThread {
+                currentText = newText
+                currentChapterHref = chapterHref
+                currentPageIndex = pageIndex
+                currentIndexState.intValue = 0
+                setupList(newText)
+            }
+        }
+
+        override fun onTransitioningChanged(isTransitioning: Boolean) {
+            runOnUiThread {
+                isLoadingNextState.value = isTransitioning
             }
         }
     }
@@ -185,6 +203,7 @@ class PlaybackActivity : ComponentActivity() {
                         isExporting = isExportingState.value,
                         exportCurrent = exportCurrentState.intValue,
                         exportTotal = exportTotalState.intValue,
+                        sleepTimerSecondsRemaining = sleepTimerSecondsState.intValue,
                         onBackClick = { finish() },
                         onItemClick = { index -> playFromIndex(index) },
                         onPlayPauseClick = { handlePlayPause() },
@@ -196,7 +215,8 @@ class PlaybackActivity : ComponentActivity() {
                                 isExportingState.value = false
                                 Toast.makeText(this@PlaybackActivity, "Audio saving cancelled", Toast.LENGTH_SHORT).show()
                             }
-                        }
+                        },
+                        onSleepTimerClick = { handleSleepTimerClick() }
                     )
 
                     if (isLoadingNextState.value) {
@@ -247,6 +267,12 @@ class PlaybackActivity : ComponentActivity() {
             // Reset state for new playback
             currentIndexState.intValue = -1
             isExportingState.value = false
+            
+            // Clear sleep timer flag for new playback
+            val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+            prefs.edit().putBoolean("sleep_timer_stopped", false).apply()
+            
+            saveState()
         }
 
         setupList(currentText)
@@ -258,31 +284,114 @@ class PlaybackActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (intent.getBooleanExtra("is_resume", false)) {
-            val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
-            val newText = prefs.getString("last_text", "") ?: ""
-            if (newText != currentText) {
-                currentText = newText
-                currentVoicePath = prefs.getString("last_voice_path", "") ?: ""
-                currentSpeed = prefs.getFloat("last_speed", 1.0f)
-                currentSteps = prefs.getInt("last_steps", 5)
-                currentLang = prefs.getString("last_lang", "en") ?: "en"
-                currentIndexState.intValue = prefs.getInt("last_index", 0)
-                setupList(currentText)
-            }
+        val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+        if (prefs.getBoolean("sleep_timer_stopped", false)) {
+            prefs.edit().putBoolean("sleep_timer_stopped", false).apply()
         }
-
-        if (isBound && playbackService != null) {
-            try {
-                playbackService?.setListener(playbackListenerStub)
-                val serviceIndex = playbackService?.getCurrentIndex() ?: -1
-                if (serviceIndex != -1) {
-                    currentIndexState.intValue = serviceIndex
+        val newText = prefs.getString("last_text", "") ?: ""
+        if (newText.isNotEmpty() && newText != currentText) {
+            currentText = newText
+            currentVoicePath = prefs.getString("last_voice_path", "") ?: ""
+            currentSpeed = prefs.getFloat("last_speed", 1.0f)
+            currentSteps = prefs.getInt("last_steps", 5)
+            currentLang = prefs.getString("last_lang", "en") ?: "en"
+            currentBookPath = prefs.getString("last_book_path", null)
+            currentChapterHref = prefs.getString("last_chapter_href", null)
+            currentPageIndex = prefs.getInt("last_page_index", -1)
+            
+            val serviceIndex = try { playbackService?.getCurrentIndex() ?: -1 } catch (_: Exception) { -1 }
+            currentIndexState.intValue = if (serviceIndex != -1) serviceIndex else prefs.getInt("last_index", 0)
+            
+            setupList(currentText)
+        } else {
+            if (isBound && playbackService != null) {
+                try {
+                    playbackService?.setListener(playbackListenerStub)
+                    val serviceIndex = playbackService?.getCurrentIndex() ?: -1
+                    if (serviceIndex != -1) {
+                        currentIndexState.intValue = serviceIndex
+                    }
+                } catch (e: RemoteException) {
+                    e.printStackTrace()
                 }
-            } catch (e: RemoteException) {
-                e.printStackTrace()
             }
         }
+        startPollingSleepTimer()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        pollingJob?.cancel()
+    }
+
+    private val playbackReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            when (intent?.action) {
+                "com.brahmadeo.supertonic.tts.SLEEP_TIMER_EXPIRED" -> {
+                    val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+                    prefs.edit().putBoolean("sleep_timer_stopped", false).apply()
+                    finish()
+                }
+                "com.brahmadeo.supertonic.tts.CHAPTER_CHANGED" -> {
+                    val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+                    currentText = prefs.getString("last_text", "") ?: ""
+                    currentChapterHref = prefs.getString("last_chapter_href", null)
+                    currentPageIndex = prefs.getInt("last_page_index", -1)
+                    currentIndexState.intValue = 0
+                    setupList(currentText)
+                }
+            }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val filter = android.content.IntentFilter().apply {
+            addAction("com.brahmadeo.supertonic.tts.SLEEP_TIMER_EXPIRED")
+            addAction("com.brahmadeo.supertonic.tts.CHAPTER_CHANGED")
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(playbackReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(playbackReceiver, filter)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        try {
+            unregisterReceiver(playbackReceiver)
+        } catch (_: Exception) {}
+    }
+
+    private var pollingJob: Job? = null
+    private fun startPollingSleepTimer() {
+        pollingJob?.cancel()
+        pollingJob = lifecycleScope.launch {
+            while (isActive) {
+                sleepTimerSecondsState.intValue = PlaybackService.sleepTimerSecondsRemaining
+                delay(500L)
+            }
+        }
+    }
+
+    private fun handleSleepTimerClick() {
+        val currentSeconds = PlaybackService.sleepTimerSecondsRemaining
+        val nextMinutes = when {
+            currentSeconds == 0 -> 10
+            currentSeconds <= 10 * 60 -> 20
+            currentSeconds <= 20 * 60 -> 30
+            else -> 0
+        }
+        
+        PlaybackService.instance?.setSleepTimer(nextMinutes)
+        
+        if (nextMinutes == 0) {
+            Toast.makeText(this, "Sleep timer turned off", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Sleep timer set to $nextMinutes minutes", Toast.LENGTH_SHORT).show()
+        }
+        sleepTimerSecondsState.intValue = nextMinutes * 60
     }
 
     private fun setupList(text: String) {
@@ -313,6 +422,7 @@ class PlaybackActivity : ComponentActivity() {
         try {
             playbackService?.stop()
         } catch (e: RemoteException) { }
+        PlaybackService.instance?.setSleepTimer(0)
         clearState()
         finish()
     }
@@ -438,143 +548,5 @@ class PlaybackActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
-    private fun handlePlaybackCompleted() {
-        val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
-        val autoPlayNext = prefs.getBoolean("pref_auto_play_next", false)
 
-        if (autoPlayNext && !currentBookPath.isNullOrEmpty()) {
-            loadAndPlayNextChapterOrPage()
-        } else {
-            finish()
-        }
-    }
-
-    private fun loadAndPlayNextChapterOrPage() {
-        val bookPath = currentBookPath ?: return
-        val ebookFile = File(bookPath)
-        if (!ebookFile.exists()) {
-            finish()
-            return
-        }
-
-        isLoadingNextState.value = true
-        
-        // Stop current service playback first to be safe
-        try {
-            playbackService?.stop()
-        } catch (_: Exception) {}
-
-        lifecycleScope.launch {
-            val pubResult = ebookParser.openPublication(ebookFile)
-            val publication = pubResult.getOrNull()
-            if (publication == null) {
-                isLoadingNextState.value = false
-                finish()
-                return@launch
-            }
-
-            val conformsToPdf = publication.metadata.conformsTo.contains(org.readium.r2.shared.publication.Publication.Profile.PDF) == true
-            val isPdfMediaType = publication.readingOrder.firstOrNull()?.mediaType?.matches(org.readium.r2.shared.util.mediatype.MediaType.PDF) == true
-            val isPdf = conformsToPdf || isPdfMediaType
-
-            if (isPdf) {
-                val nextPageIndex = currentPageIndex + 1
-                val totalPages = publication.positions().size
-                if (nextPageIndex in 0 until totalPages) {
-                    val extractResult = ebookParser.extractPages(ebookFile, publication, listOf(nextPageIndex))
-                    isLoadingNextState.value = false
-                    extractResult.onSuccess { nextText ->
-                        val preparedText = prepareTextForTts(nextText, currentLang)
-                        currentText = preparedText
-                        currentPageIndex = nextPageIndex
-                        currentChapterHref = null
-                        
-                        // Update intent
-                        intent.putExtra(EXTRA_TEXT, currentText)
-                        intent.putExtra(EXTRA_PAGE_INDEX, currentPageIndex)
-                        intent.removeExtra(EXTRA_CHAPTER_HREF)
-                        
-                        setupList(currentText)
-                        EbookManager.setLastReadChapter(this@PlaybackActivity, bookPath, "page_$nextPageIndex")
-                        
-                        // Wait a tiny bit and start playback
-                        currentIndexState.intValue = 0
-                        playFromIndex(0)
-                    }.onFailure {
-                        Toast.makeText(this@PlaybackActivity, "Failed to load next page: ${it.message}", Toast.LENGTH_SHORT).show()
-                        finish()
-                    }
-                } else {
-                    isLoadingNextState.value = false
-                    Toast.makeText(this@PlaybackActivity, "End of document reached", Toast.LENGTH_SHORT).show()
-                    finish()
-                }
-            } else {
-                val toc = publication.tableOfContents
-                val links = toc.ifEmpty { publication.readingOrder }
-                
-                // Helper to flatten
-                fun List<org.readium.r2.shared.publication.Link>.flatten(): List<org.readium.r2.shared.publication.Link> {
-                    val result = mutableListOf<org.readium.r2.shared.publication.Link>()
-                    fun traverse(links: List<org.readium.r2.shared.publication.Link>) {
-                        for (link in links) {
-                            result.add(link)
-                            traverse(link.children)
-                        }
-                    }
-                    traverse(this)
-                    return result
-                }
-                
-                val flatLinks = links.flatten()
-                val currentHref = currentChapterHref
-                val currentIndex = flatLinks.indexOfFirst { it.href.toString() == currentHref }
-
-                if (currentIndex != -1 && currentIndex + 1 < flatLinks.size) {
-                    val nextLink = flatLinks[currentIndex + 1]
-                    val nextHref = nextLink.href.toString()
-                    
-                    val extractResult = ebookParser.extractText(publication, nextLink)
-                    isLoadingNextState.value = false
-                    extractResult.onSuccess { nextText ->
-                        val preparedText = prepareTextForTts(nextText, currentLang)
-                        currentText = preparedText
-                        currentChapterHref = nextHref
-                        currentPageIndex = -1
-                        
-                        // Update intent
-                        intent.putExtra(EXTRA_TEXT, currentText)
-                        intent.putExtra(EXTRA_CHAPTER_HREF, currentChapterHref)
-                        intent.removeExtra(EXTRA_PAGE_INDEX)
-                        
-                        setupList(currentText)
-                        EbookManager.setLastReadChapter(this@PlaybackActivity, bookPath, nextHref)
-                        
-                        currentIndexState.intValue = 0
-                        playFromIndex(0)
-                    }.onFailure {
-                        Toast.makeText(this@PlaybackActivity, "Failed to load next chapter: ${it.message}", Toast.LENGTH_SHORT).show()
-                        finish()
-                    }
-                } else {
-                    isLoadingNextState.value = false
-                    Toast.makeText(this@PlaybackActivity, "End of book reached", Toast.LENGTH_SHORT).show()
-                    finish()
-                }
-            }
-        }
-    }
-
-    private fun prepareTextForTts(text: String?, lang: String): String {
-        if (text.isNullOrEmpty()) return ""
-        val trimmed = text.trim()
-        
-        // Append " ." to prevent diffusion model from cutting off abruptly at the end
-        // RESTRICTED for Korean
-        if (lang.lowercase().startsWith("ko")) {
-            return trimmed
-        }
-        
-        return if (trimmed.endsWith(" .")) trimmed else "$trimmed ."
-    }
 }
