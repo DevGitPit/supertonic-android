@@ -144,6 +144,12 @@ class PlaybackActivity : ComponentActivity() {
                 isLoadingNextState.value = isTransitioning
             }
         }
+
+        override fun onSleepTimerUpdated(secondsRemaining: Int) {
+            runOnUiThread {
+                sleepTimerSecondsState.intValue = secondsRemaining
+            }
+        }
     }
 
     private val connection = object : ServiceConnection {
@@ -300,7 +306,6 @@ class PlaybackActivity : ComponentActivity() {
         } else {
             if (isBound && playbackService != null) {
                 try {
-                    playbackService?.setListener(playbackListenerStub)
                     val serviceIndex = playbackService?.getCurrentIndex() ?: -1
                     if (serviceIndex != -1) {
                         currentIndexState.intValue = serviceIndex
@@ -310,12 +315,18 @@ class PlaybackActivity : ComponentActivity() {
                 }
             }
         }
-        startPollingSleepTimer()
+
+        if (isBound && playbackService != null) {
+            try {
+                playbackService?.setListener(playbackListenerStub)
+            } catch (e: RemoteException) {
+                e.printStackTrace()
+            }
+        }
     }
 
     override fun onPause() {
         super.onPause()
-        pollingJob?.cancel()
     }
 
     private val playbackReceiver = object : android.content.BroadcastReceiver() {
@@ -347,24 +358,13 @@ class PlaybackActivity : ComponentActivity() {
         } catch (_: Exception) {}
     }
 
-    private var pollingJob: Job? = null
-    private fun startPollingSleepTimer() {
-        pollingJob?.cancel()
-        pollingJob = lifecycleScope.launch {
-            while (isActive) {
-                sleepTimerSecondsState.intValue = PlaybackService.sleepTimerSecondsRemaining
-                delay(500L)
-            }
-        }
-    }
-
     private fun handleSleepTimerClick() {
-        val service = PlaybackService.instance
-        if (service == null) {
+        val service = playbackService
+        if (!isBound || service == null) {
             Toast.makeText(this, "Playback service not ready", Toast.LENGTH_SHORT).show()
             return
         }
-        val currentSeconds = PlaybackService.sleepTimerSecondsRemaining
+        val currentSeconds = try { service.getSleepTimerSeconds() } catch (e: RemoteException) { 0 }
         val nextMinutes = when {
             currentSeconds == 0 -> 10
             currentSeconds <= 10 * 60 -> 20
@@ -372,7 +372,11 @@ class PlaybackActivity : ComponentActivity() {
             else -> 0
         }
         
-        service.setSleepTimer(nextMinutes)
+        try {
+            service.setSleepTimer(nextMinutes)
+        } catch (e: RemoteException) {
+            e.printStackTrace()
+        }
         
         if (nextMinutes == 0) {
             Toast.makeText(this, "Sleep timer turned off", Toast.LENGTH_SHORT).show()

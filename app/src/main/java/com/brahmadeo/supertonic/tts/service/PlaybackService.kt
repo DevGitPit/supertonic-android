@@ -85,6 +85,14 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         override fun getCurrentIndex(): Int {
             return currentSentenceIndex
         }
+
+        override fun setSleepTimer(minutes: Int) {
+            this@PlaybackService.setSleepTimer(minutes)
+        }
+
+        override fun getSleepTimerSeconds(): Int {
+            return sleepTimerSecondsRemaining
+        }
     }
 
     private val listeners = RemoteCallbackList<IPlaybackListener>()
@@ -96,6 +104,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                 listener.onStateChanged(isPlaying, audioTrack != null || isSynthesizing, isSynthesizing)
                 listener.onProgress(currentSentenceIndex, -1)
                 listener.onTransitioningChanged(isTransitioningChapter)
+                listener.onSleepTimerUpdated(sleepTimerSecondsRemaining)
             } catch (_: RemoteException) {}
         }
     }
@@ -104,6 +113,16 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         if (listener != null) {
             listeners.unregister(listener)
         }
+    }
+
+    private fun notifyListenerSleepTimer(seconds: Int) {
+        val n = listeners.beginBroadcast()
+        for (i in 0 until n) {
+            try {
+                listeners.getBroadcastItem(i).onSleepTimerUpdated(seconds)
+            } catch (_: RemoteException) {}
+        }
+        listeners.finishBroadcast()
     }
 
     private lateinit var mediaSession: MediaSessionCompat
@@ -115,6 +134,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
     private val ebookParser by lazy { com.brahmadeo.supertonic.tts.utils.EbookParser(this) }
     private var resumeOnFocusGain = false
     private var isTransitioningChapter = false
+    private var sleepTimerSecondsRemaining = 0
     
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private var wakeLock: android.os.PowerManager.WakeLock? = null
@@ -158,9 +178,6 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         const val TAG = "PlaybackService"
         const val VOLUME_BOOST_FACTOR = 2.5f
         const val AUDIO_WRITE_CHUNK_SIZE = 8192
-
-        @Volatile var instance: PlaybackService? = null
-        @Volatile var sleepTimerSecondsRemaining = 0
     }
 
     override fun onBind(intent: Intent): IBinder {
@@ -169,7 +186,6 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
 
     override fun onCreate() {
         super.onCreate()
-        instance = this
         createNotificationChannel()
         com.brahmadeo.supertonic.tts.utils.LexiconManager.load(this)
         QueueManager.initialize(this)
@@ -232,6 +248,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
     }
 
     private var synthesisJob: Job? = null
+    private var loadChapterJob: Job? = null
 
     fun synthesizeAndPlay(text: String, lang: String, stylePath: String, speed: Float, steps: Int, startIndex: Int = 0) {
         serviceScope.launch {
@@ -523,6 +540,10 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         resumeOnFocusGain = false
         notifyListenerState(false)
         abandonAudioFocus()
+        if (removeNotification) {
+            isTransitioningChapter = false
+            loadChapterJob?.cancel()
+        }
         if (!isTransitioningChapter) {
             if (wakeLock?.isHeld == true) wakeLock?.release()
             setSleepTimer(0)
@@ -794,8 +815,10 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         sleepTimerJob?.cancel()
         if (minutes == 0) {
             sleepTimerSecondsRemaining = 0
+            notifyListenerSleepTimer(0)
         } else {
             sleepTimerSecondsRemaining = minutes * 60
+            notifyListenerSleepTimer(sleepTimerSecondsRemaining)
             startSleepTimerCountdown()
         }
     }
@@ -806,6 +829,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                 delay(1000L)
                 if (isPlaying) {
                     sleepTimerSecondsRemaining -= 1
+                    notifyListenerSleepTimer(sleepTimerSecondsRemaining)
                 }
             }
             
@@ -842,7 +866,8 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
             wakeLock?.acquire(5 * 60 * 1000L)
         }
 
-        serviceScope.launch {
+        loadChapterJob?.cancel()
+        loadChapterJob = serviceScope.launch {
             val pubResult = ebookParser.openPublication(ebookFile)
             val publication = pubResult.getOrNull()
             if (publication == null) {
@@ -883,10 +908,11 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
 
                         notifyListenerChapterChanged(preparedText, null, nextPageIndex)
 
-                        isTransitioningChapter = false
-                        notifyListenerTransitioning(false)
                         SupertonicTTS.reset()
                         synthesizeAndPlay(preparedText, currentLang, currentVoicePath, currentSpeed, currentSteps, 0)
+
+                        isTransitioningChapter = false
+                        notifyListenerTransitioning(false)
                     }.onFailure {
                         isTransitioningChapter = false
                         notifyListenerTransitioning(false)
@@ -936,10 +962,11 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
 
                         notifyListenerChapterChanged(preparedText, nextHref, -1)
 
-                        isTransitioningChapter = false
-                        notifyListenerTransitioning(false)
                         SupertonicTTS.reset()
                         synthesizeAndPlay(preparedText, currentLang, currentVoicePath, currentSpeed, currentSteps, 0)
+                        
+                        isTransitioningChapter = false
+                        notifyListenerTransitioning(false)
                     }.onFailure {
                         isTransitioningChapter = false
                         notifyListenerTransitioning(false)
@@ -965,7 +992,6 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
 
     override fun onDestroy() {
         super.onDestroy()
-        instance = null
         sleepTimerJob?.cancel()
         mediaSession.release()
         try {

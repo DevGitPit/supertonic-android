@@ -13,4 +13,6 @@ interface IPlaybackService {
     oneway void removeListener(IPlaybackListener listener);
     oneway void exportAudio(String text, String lang, String stylePath, float speed, int steps, String outputPath);
     int getCurrentIndex();
+    oneway void setSleepTimer(int minutes);
+    int getSleepTimerSeconds();
 }
