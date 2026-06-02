@@ -122,6 +122,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         override fun onTransitioningChanged(isTransitioning: Boolean) { }
+        override fun onSleepTimerUpdated(secondsRemaining: Int) { }
     }
 
     private val connection = object : ServiceConnection {
