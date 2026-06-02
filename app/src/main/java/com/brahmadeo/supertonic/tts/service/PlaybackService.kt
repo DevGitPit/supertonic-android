@@ -540,18 +540,20 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         resumeOnFocusGain = false
         notifyListenerState(false)
         abandonAudioFocus()
-        if (removeNotification) {
+        
+        if (isTransitioningChapter) {
             isTransitioningChapter = false
-            loadChapterJob?.cancel()
+            notifyListenerTransitioning(false)
         }
-        if (!isTransitioningChapter) {
+        loadChapterJob?.cancel()
+
+        if (removeNotification) {
             if (wakeLock?.isHeld == true) wakeLock?.release()
             setSleepTimer(0)
             getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).edit()
                 .putBoolean("is_playing", false)
                 .apply()
-        }
-        if (removeNotification) {
+                
             notifyListenerPlaybackStopped()
             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
             stopForeground(STOP_FOREGROUND_REMOVE)
