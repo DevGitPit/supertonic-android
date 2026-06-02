@@ -268,10 +268,7 @@ class PlaybackActivity : ComponentActivity() {
             currentIndexState.intValue = -1
             isExportingState.value = false
             
-            // Clear sleep timer flag for new playback
-            val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
-            prefs.edit().putBoolean("sleep_timer_stopped", false).apply()
-            
+
             saveState()
         }
 
@@ -285,9 +282,6 @@ class PlaybackActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
-        if (prefs.getBoolean("sleep_timer_stopped", false)) {
-            prefs.edit().putBoolean("sleep_timer_stopped", false).apply()
-        }
         val newText = prefs.getString("last_text", "") ?: ""
         if (newText.isNotEmpty() && newText != currentText) {
             currentText = newText
@@ -328,17 +322,7 @@ class PlaybackActivity : ComponentActivity() {
         override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
             when (intent?.action) {
                 "com.brahmadeo.supertonic.tts.SLEEP_TIMER_EXPIRED" -> {
-                    val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
-                    prefs.edit().putBoolean("sleep_timer_stopped", false).apply()
                     finish()
-                }
-                "com.brahmadeo.supertonic.tts.CHAPTER_CHANGED" -> {
-                    val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
-                    currentText = prefs.getString("last_text", "") ?: ""
-                    currentChapterHref = prefs.getString("last_chapter_href", null)
-                    currentPageIndex = prefs.getInt("last_page_index", -1)
-                    currentIndexState.intValue = 0
-                    setupList(currentText)
                 }
             }
         }
@@ -348,7 +332,6 @@ class PlaybackActivity : ComponentActivity() {
         super.onStart()
         val filter = android.content.IntentFilter().apply {
             addAction("com.brahmadeo.supertonic.tts.SLEEP_TIMER_EXPIRED")
-            addAction("com.brahmadeo.supertonic.tts.CHAPTER_CHANGED")
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(playbackReceiver, filter, RECEIVER_NOT_EXPORTED)
@@ -376,6 +359,11 @@ class PlaybackActivity : ComponentActivity() {
     }
 
     private fun handleSleepTimerClick() {
+        val service = PlaybackService.instance
+        if (service == null) {
+            Toast.makeText(this, "Playback service not ready", Toast.LENGTH_SHORT).show()
+            return
+        }
         val currentSeconds = PlaybackService.sleepTimerSecondsRemaining
         val nextMinutes = when {
             currentSeconds == 0 -> 10
@@ -384,7 +372,7 @@ class PlaybackActivity : ComponentActivity() {
             else -> 0
         }
         
-        PlaybackService.instance?.setSleepTimer(nextMinutes)
+        service.setSleepTimer(nextMinutes)
         
         if (nextMinutes == 0) {
             Toast.makeText(this, "Sleep timer turned off", Toast.LENGTH_SHORT).show()

@@ -150,7 +150,7 @@ fun PlaybackScreen(
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(
                                         imageVector = Icons.Default.Snooze,
-                                        contentDescription = "Sleep Timer",
+                                        contentDescription = androidx.compose.ui.res.stringResource(id = com.brahmadeo.supertonic.tts.R.string.timer_label),
                                         modifier = Modifier.size(24.dp),
                                         tint = if (sleepTimerSecondsRemaining > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -160,7 +160,7 @@ fun PlaybackScreen(
                                         val secs = sleepTimerSecondsRemaining % 60
                                         String.format(java.util.Locale.US, "%02d:%02d", mins, secs)
                                     } else {
-                                        "Timer"
+                                        androidx.compose.ui.res.stringResource(id = com.brahmadeo.supertonic.tts.R.string.timer_label)
                                     }
                                     Text(
                                         text = text,
@@ -178,13 +178,13 @@ fun PlaybackScreen(
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(
                                         imageVector = Icons.Default.Close,
-                                        contentDescription = "Stop",
+                                        contentDescription = androidx.compose.ui.res.stringResource(id = com.brahmadeo.supertonic.tts.R.string.stop_label),
                                         modifier = Modifier.size(24.dp),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = "Stop",
+                                        text = androidx.compose.ui.res.stringResource(id = com.brahmadeo.supertonic.tts.R.string.stop_label),
                                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                     )
@@ -216,13 +216,13 @@ fun PlaybackScreen(
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(
                                         imageVector = Icons.Default.Save,
-                                        contentDescription = "Export",
+                                        contentDescription = androidx.compose.ui.res.stringResource(id = com.brahmadeo.supertonic.tts.R.string.save_label),
                                         modifier = Modifier.size(24.dp),
                                         tint = if (isExporting) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) else MaterialTheme.colorScheme.primary
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = "Save",
+                                        text = androidx.compose.ui.res.stringResource(id = com.brahmadeo.supertonic.tts.R.string.save_label),
                                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                                         color = if (isExporting) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                                     )

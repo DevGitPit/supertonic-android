@@ -112,6 +112,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
     @Volatile private var isPlaying = false
     @Volatile private var isSynthesizing = false
     private val textNormalizer = TextNormalizer()
+    private val ebookParser by lazy { com.brahmadeo.supertonic.tts.utils.EbookParser(this) }
     private var resumeOnFocusGain = false
     private var isTransitioningChapter = false
     
@@ -159,7 +160,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         const val AUDIO_WRITE_CHUNK_SIZE = 8192
 
         @Volatile var instance: PlaybackService? = null
-        var sleepTimerSecondsRemaining = 0
+        @Volatile var sleepTimerSecondsRemaining = 0
     }
 
     override fun onBind(intent: Intent): IBinder {
@@ -175,7 +176,9 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
 
         audioManager = attributionContext.getSystemService(AUDIO_SERVICE) as AudioManager
         val powerManager = attributionContext.getSystemService(POWER_SERVICE) as android.os.PowerManager
-        wakeLock = powerManager.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "Supertonic:PlaybackWakeLock")
+        wakeLock = powerManager.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "Supertonic:PlaybackWakeLock").apply {
+            setReferenceCounted(false)
+        }
         
         mediaSession = MediaSessionCompat(attributionContext, "SupertonicMediaSession").apply {
             setCallback(object : MediaSessionCompat.Callback() {
@@ -806,11 +809,9 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                 }
             }
             
-            getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).edit()
-                .putBoolean("sleep_timer_stopped", true)
-                .apply()
-
-            val intent = Intent("com.brahmadeo.supertonic.tts.SLEEP_TIMER_EXPIRED")
+            val intent = Intent("com.brahmadeo.supertonic.tts.SLEEP_TIMER_EXPIRED").apply {
+                setPackage(packageName)
+            }
             sendBroadcast(intent)
             stopServicePlayback()
         }
@@ -842,7 +843,6 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         }
 
         serviceScope.launch {
-            val ebookParser = com.brahmadeo.supertonic.tts.utils.EbookParser(this@PlaybackService)
             val pubResult = ebookParser.openPublication(ebookFile)
             val publication = pubResult.getOrNull()
             if (publication == null) {
@@ -880,10 +880,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                         
                         com.brahmadeo.supertonic.tts.utils.EbookManager.setLastReadChapter(this@PlaybackService, bookPath, "page_$nextPageIndex")
                         
-                        val intent = Intent("com.brahmadeo.supertonic.tts.CHAPTER_CHANGED").apply {
-                            `package` = packageName
-                        }
-                        sendBroadcast(intent)
+
                         notifyListenerChapterChanged(preparedText, null, nextPageIndex)
 
                         isTransitioningChapter = false
@@ -936,10 +933,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                         
                         com.brahmadeo.supertonic.tts.utils.EbookManager.setLastReadChapter(this@PlaybackService, bookPath, nextHref)
                         
-                        val intent = Intent("com.brahmadeo.supertonic.tts.CHAPTER_CHANGED").apply {
-                            `package` = packageName
-                        }
-                        sendBroadcast(intent)
+
                         notifyListenerChapterChanged(preparedText, nextHref, -1)
 
                         isTransitioningChapter = false

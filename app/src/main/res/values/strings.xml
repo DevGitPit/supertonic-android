@@ -55,6 +55,9 @@
     <string name="saving_audio">Saving Audio…</string>
     <string name="saved_to_fmt">Saved to %1$s</string>
     <string name="export_failed">Export Failed</string>
+    <string name="timer_label">Timer</string>
+    <string name="stop_label">Stop</string>
+    <string name="save_label">Save</string>
 
     <!-- History Activity -->
     <string name="history_title">History</string>
