@@ -176,11 +176,6 @@ class PlaybackActivity : ComponentActivity() {
                 } else {
                     // Service is idle
                     if (shouldResume) {
-                        val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
-                        val wasPlayingBefore = prefs.getBoolean("is_playing", false)
-                        if (wasPlayingBefore) {
-                            playFromIndex(currentIndexState.intValue)
-                        }
                         restoreState()
                     } else {
                         startPlaybackFromIntent()
