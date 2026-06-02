@@ -414,7 +414,6 @@ class PlaybackActivity : ComponentActivity() {
         try {
             playbackService?.stop()
         } catch (e: RemoteException) { }
-        PlaybackService.instance?.setSleepTimer(0)
         clearState()
         finish()
     }
