@@ -73,6 +73,7 @@ class PlaybackActivity : ComponentActivity() {
     private var currentBookPath: String? = null
     private var currentChapterHref: String? = null
     private var currentPageIndex: Int = -1
+    private var isRecreating = false
     private val isLoadingNextState = mutableStateOf(false)
     private lateinit var ebookParser: EbookParser
 
@@ -159,21 +160,31 @@ class PlaybackActivity : ComponentActivity() {
                 playbackService?.setListener(playbackListenerStub)
                 isBound = true
 
-                if (intent.getBooleanExtra("is_resume", false)) {
-                    val isActive = playbackService?.isServiceActive == true
-                    if (isActive) {
-                        val serviceIndex = playbackService?.getCurrentIndex() ?: -1
-                        if (serviceIndex != -1) {
-                            currentIndexState.intValue = serviceIndex
-                        }
-                    } else {
-                        // Not playing in service, but user wants to resume: 
-                        // Start playback from the saved index
-                        playFromIndex(currentIndexState.intValue)
+                val isResumeExtra = intent.getBooleanExtra("is_resume", false)
+                val hasTextExtra = intent.hasExtra(EXTRA_TEXT)
+                val shouldResume = isResumeExtra || isRecreating || !hasTextExtra
+                
+                val isServiceActive = try { playbackService?.isServiceActive == true } catch (_: Exception) { false }
+
+                if (isServiceActive) {
+                    // Service is already active, sync to it
+                    val serviceIndex = playbackService?.getCurrentIndex() ?: -1
+                    if (serviceIndex != -1) {
+                        currentIndexState.intValue = serviceIndex
                     }
                     restoreState()
                 } else {
-                    startPlaybackFromIntent()
+                    // Service is idle
+                    if (shouldResume) {
+                        val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+                        val wasPlayingBefore = prefs.getBoolean("is_playing", false)
+                        if (wasPlayingBefore) {
+                            playFromIndex(currentIndexState.intValue)
+                        }
+                        restoreState()
+                    } else {
+                        startPlaybackFromIntent()
+                    }
                 }
             } catch (e: RemoteException) {
                 e.printStackTrace()
@@ -187,6 +198,7 @@ class PlaybackActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        isRecreating = savedInstanceState != null
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         ebookParser = EbookParser(this)
@@ -247,9 +259,11 @@ class PlaybackActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent) {
-        val isResume = intent.getBooleanExtra("is_resume", false)
+        val isResumeExtra = intent.getBooleanExtra("is_resume", false)
+        val hasTextExtra = intent.hasExtra(EXTRA_TEXT)
+        val shouldResume = isResumeExtra || isRecreating || !hasTextExtra
         
-        if (isResume) {
+        if (shouldResume) {
             val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
             currentText = prefs.getString("last_text", "") ?: ""
             currentVoicePath = prefs.getString("last_voice_path", "") ?: ""
@@ -279,10 +293,6 @@ class PlaybackActivity : ComponentActivity() {
         }
 
         setupList(currentText)
-        
-        if (isBound && !isResume) {
-            startPlaybackFromIntent()
-        }
     }
 
     override fun onResume() {
