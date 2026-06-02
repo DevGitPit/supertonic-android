@@ -993,6 +993,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
     override fun onDestroy() {
         super.onDestroy()
         sleepTimerJob?.cancel()
+        loadChapterJob?.cancel()
         mediaSession.release()
         try {
             audioTrack?.release()
