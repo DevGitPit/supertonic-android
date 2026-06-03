@@ -166,23 +166,24 @@ class PlaybackActivity : ComponentActivity() {
                 
                 val isServiceActive = try { playbackService?.isServiceActive == true } catch (_: Exception) { false }
 
-                if (isServiceActive) {
-                    // Service is already active, sync to it
+                if (shouldResume && isServiceActive) {
+                    // Service is already active and we want to resume/sync to it
                     val serviceIndex = playbackService?.getCurrentIndex() ?: -1
                     if (serviceIndex != -1) {
                         currentIndexState.intValue = serviceIndex
                     }
                     restoreState()
+                } else if (shouldResume) {
+                    // Service is idle and we want to resume
+                    restoreState()
                 } else {
-                    // Service is idle
-                    if (shouldResume) {
-                        restoreState()
-                    } else {
-                        startPlaybackFromIntent()
-                    }
+                    // New playback request (hasTextExtra is true and not a resume request)
+                    startPlaybackFromIntent()
                 }
             } catch (e: RemoteException) {
                 e.printStackTrace()
+                Toast.makeText(this@PlaybackActivity, "Failed to connect to playback service", Toast.LENGTH_SHORT).show()
+                finish()
             }
         }
 
@@ -542,6 +543,14 @@ class PlaybackActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIntent(intent)
+        
+        // If a new playback intent is delivered, trigger playback start
+        val isResumeExtra = intent.getBooleanExtra("is_resume", false)
+        val hasTextExtra = intent.hasExtra(EXTRA_TEXT)
+        val shouldResume = isResumeExtra || !hasTextExtra
+        if (!shouldResume && isBound) {
+            startPlaybackFromIntent()
+        }
     }
 
 
