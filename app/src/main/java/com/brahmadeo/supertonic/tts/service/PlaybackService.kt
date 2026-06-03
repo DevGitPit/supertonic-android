@@ -903,6 +903,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                             .putString("last_text", preparedText)
                             .putInt("last_page_index", nextPageIndex)
                             .remove("last_chapter_href")
+                            .putInt("last_index", 0)
                             .apply()
                         
                         com.brahmadeo.supertonic.tts.utils.EbookManager.setLastReadChapter(this@PlaybackService, bookPath, "page_$nextPageIndex")
@@ -957,6 +958,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                             .putString("last_text", preparedText)
                             .putString("last_chapter_href", nextHref)
                             .remove("last_page_index")
+                            .putInt("last_index", 0)
                             .apply()
                         
                         com.brahmadeo.supertonic.tts.utils.EbookManager.setLastReadChapter(this@PlaybackService, bookPath, nextHref)
