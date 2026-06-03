@@ -87,7 +87,9 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         }
 
         override fun setSleepTimer(minutes: Int) {
-            this@PlaybackService.setSleepTimer(minutes)
+            serviceScope.launch {
+                this@PlaybackService.setSleepTimer(minutes)
+            }
         }
 
         override fun getSleepTimerSeconds(): Int {
@@ -133,8 +135,8 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
     private val textNormalizer = TextNormalizer()
     private val ebookParser by lazy { com.brahmadeo.supertonic.tts.utils.EbookParser(this) }
     private var resumeOnFocusGain = false
-    private var isTransitioningChapter = false
-    private var sleepTimerSecondsRemaining = 0
+    @Volatile private var isTransitioningChapter = false
+    @Volatile private var sleepTimerSecondsRemaining = 0
     
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private var wakeLock: android.os.PowerManager.WakeLock? = null
@@ -996,6 +998,9 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         super.onDestroy()
         sleepTimerJob?.cancel()
         loadChapterJob?.cancel()
+        if (wakeLock?.isHeld == true) {
+            try { wakeLock?.release() } catch (_: Exception) {}
+        }
         mediaSession.release()
         try {
             audioTrack?.release()

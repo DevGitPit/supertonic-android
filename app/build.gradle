@@ -177,7 +177,7 @@ kotlin {
         freeCompilerArgs.addAll(
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=org.readium.r2.shared.InternalReadiumApi",
-            "-opt-in=org.readium.r2.shared.util.InternalReadiumApi"
+            "-opt-in=org.readium.r2.shared.ExperimentalReadiumApi"
         )
     }
 }

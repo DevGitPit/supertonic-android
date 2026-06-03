@@ -379,16 +379,16 @@ class PlaybackActivity : ComponentActivity() {
         
         try {
             service.setSleepTimer(nextMinutes)
+            if (nextMinutes == 0) {
+                Toast.makeText(this, "Sleep timer turned off", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Sleep timer set to $nextMinutes minutes", Toast.LENGTH_SHORT).show()
+            }
+            sleepTimerSecondsState.intValue = nextMinutes * 60
         } catch (e: RemoteException) {
             e.printStackTrace()
+            Toast.makeText(this, "Failed to set sleep timer", Toast.LENGTH_SHORT).show()
         }
-        
-        if (nextMinutes == 0) {
-            Toast.makeText(this, "Sleep timer turned off", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "Sleep timer set to $nextMinutes minutes", Toast.LENGTH_SHORT).show()
-        }
-        sleepTimerSecondsState.intValue = nextMinutes * 60
     }
 
     private fun setupList(text: String) {
