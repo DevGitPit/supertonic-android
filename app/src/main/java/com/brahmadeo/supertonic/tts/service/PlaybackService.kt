@@ -866,9 +866,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
 
         isTransitioningChapter = true
         notifyListenerTransitioning(true)
-        if (wakeLock?.isHeld == false) {
-            wakeLock?.acquire(5 * 60 * 1000L)
-        }
+        wakeLock?.acquire(5 * 60 * 1000L)
 
         loadChapterJob?.cancel()
         loadChapterJob = serviceScope.launch {
@@ -996,6 +994,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
 
     override fun onDestroy() {
         super.onDestroy()
+        SupertonicTTS.setCancelled(true)
         sleepTimerJob?.cancel()
         loadChapterJob?.cancel()
         if (wakeLock?.isHeld == true) {
