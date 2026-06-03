@@ -35,6 +35,16 @@ def getRustTargets() {
     return ["arm64", "arm", "x86", "x86_64"]
 }
 
+def getAndroidAbiFilters() {
+    def targets = getRustTargets()
+    def filters = []
+    if (targets.contains("arm64")) filters.add("arm64-v8a")
+    if (targets.contains("arm")) filters.add("armeabi-v7a")
+    if (targets.contains("x86")) filters.add("x86")
+    if (targets.contains("x86_64")) filters.add("x86_64")
+    return filters
+}
+
 def isSplitApksEnabled() {
     return project.hasProperty('splitApks') && project.property('splitApks').toString().toBoolean()
 }
@@ -112,6 +122,10 @@ android {
         targetSdk 36
         versionCode 18
         versionName "3.1.9"
+
+        ndk {
+            abiFilters.addAll(getAndroidAbiFilters())
+        }
 
         // Cargo.targets handles the build, and splits handles the packaging.
     }
