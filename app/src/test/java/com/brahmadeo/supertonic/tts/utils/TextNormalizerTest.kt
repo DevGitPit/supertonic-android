@@ -137,6 +137,31 @@ class TextNormalizerTest {
     }
 
     @Test
+    fun testMcMacFitzNamesNormalization() {
+        val normalizer = TextNormalizer()
+        
+        // Mc names
+        assertEquals("Mcdonald", normalizer.normalize("McDonald", "en"))
+        assertEquals("Mcgrath", normalizer.normalize("McGrath", "en"))
+        assertEquals("Mcclean", normalizer.normalize("McClean", "en"))
+        assertEquals("Mckenzie", normalizer.normalize("McKenzie", "en"))
+        assertEquals("Mccarthy", normalizer.normalize("McCarthy", "en"))
+        assertEquals("Mcguire", normalizer.normalize("McGuire", "en"))
+        
+        // Mac names
+        assertEquals("Macdonald", normalizer.normalize("MacDonald", "en"))
+        assertEquals("Macarthur", normalizer.normalize("MacArthur", "en"))
+        
+        // Fitz names
+        assertEquals("Fitzgerald", normalizer.normalize("FitzGerald", "en"))
+        
+        // A complex sentence containing these names (from user's request)
+        val originalText = "Douglas McGrath and Fiona McDonald corporate-sponsored the event alongside Arthur McClean, Brenda McKenzie, Garrett McCarthy, and Seamus McGuire."
+        val expectedText = "Douglas Mcgrath and Fiona Mcdonald corporate-sponsored the event alongside Arthur Mcclean, Brenda Mckenzie, Garrett Mccarthy, and Seamus Mcguire."
+        assertEquals(expectedText, normalizer.normalize(originalText, "en"))
+    }
+
+    @Test
     fun testGodOfWoodsPart1Chunking() {
         val file = java.io.File("src/test/resources/part1_text.txt")
         assert(file.exists()) { "part1_text.txt does not exist at ${file.absolutePath}" }

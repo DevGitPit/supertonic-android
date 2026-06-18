@@ -231,10 +231,23 @@ class TextNormalizer {
             return processedText
         }
 
+        // Normalize names like McDonald, MacDonald, FitzGerald to Mcdonald, Macdonald, Fitzgerald
+        // to prevent them from being split by smushedWordPattern1 and to ensure correct pronunciation.
+        val namePrefixPattern = Pattern.compile("\\b(Mc|Mac|Fitz)([A-Z])")
+        val namePrefixMatcher = namePrefixPattern.matcher(processedText)
+        val namePrefixSb = StringBuffer()
+        while (namePrefixMatcher.find()) {
+            val prefix = namePrefixMatcher.group(1) ?: ""
+            val upperChar = namePrefixMatcher.group(2) ?: ""
+            namePrefixMatcher.appendReplacement(namePrefixSb, "$prefix${upperChar.lowercase()}")
+        }
+        namePrefixMatcher.appendTail(namePrefixSb)
+        val preparedText = namePrefixSb.toString()
+
         // Step 0: Fix smushed text from webpage layouts
         // Fix smushed sentences: lowercase char, period, uppercase char (reserved.Reuse)
         val smushedSentencePattern = Pattern.compile("([a-z])\\.([A-Z])")
-        var fixedText = smushedSentencePattern.matcher(processedText).replaceAll("$1. $2")
+        var fixedText = smushedSentencePattern.matcher(preparedText).replaceAll("$1. $2")
         
         // Fix smushed words: lowercase char, uppercase char (economyIMF)
         val smushedWordPattern1 = Pattern.compile("([a-z])([A-Z])")
