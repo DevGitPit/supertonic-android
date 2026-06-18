@@ -174,7 +174,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         }
     }
 
-    private var currentSentenceIndex: Int = 0
+    private var currentSentenceIndex: Int = -1
     private var cachedBookPath: String? = null
 
     companion object {
@@ -553,6 +553,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         loadChapterJob?.cancel()
 
         if (removeNotification) {
+            currentSentenceIndex = -1
             if (wakeLock?.isHeld == true) wakeLock?.release()
             setSleepTimer(0)
             getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).edit()

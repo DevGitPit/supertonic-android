@@ -102,6 +102,9 @@ class PlaybackActivity : ComponentActivity() {
                     exportCurrentState.intValue = current
                     exportTotalState.intValue = total
                 } else {
+                    if (current == -1) {
+                        return@runOnUiThread
+                    }
                     currentIndexState.intValue = current
                     updateIndexState(current)
                     if (total > 0 && current !in 0 until total) {
@@ -164,17 +167,11 @@ class PlaybackActivity : ComponentActivity() {
                 val hasTextExtra = intent.hasExtra(EXTRA_TEXT)
                 val shouldResume = isResumeExtra || isRecreating || !hasTextExtra
                 
-                val isServiceActive = try { playbackService?.isServiceActive == true } catch (_: Exception) { false }
-
-                if (shouldResume && isServiceActive) {
-                    // Service is already active and we want to resume/sync to it
-                    val serviceIndex = playbackService?.getCurrentIndex() ?: -1
+                if (shouldResume) {
+                    val serviceIndex = try { playbackService?.getCurrentIndex() ?: -1 } catch (_: Exception) { -1 }
                     if (serviceIndex != -1) {
                         currentIndexState.intValue = serviceIndex
                     }
-                    restoreState()
-                } else if (shouldResume) {
-                    // Service is idle and we want to resume
                     restoreState()
                 } else {
                     // New playback request (hasTextExtra is true and not a resume request)
