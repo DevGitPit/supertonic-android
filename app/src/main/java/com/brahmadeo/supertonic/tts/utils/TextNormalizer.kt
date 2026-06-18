@@ -221,9 +221,8 @@ class TextNormalizer {
             else -> "${num}th"
         }
     }
+        private val currencyNormalizer = CurrencyNormalizer()
     }
-
-    private val currencyNormalizer = CurrencyNormalizer()
 
     fun normalize(text: String, lang: String = "en", isAdvancedEnabled: Boolean = false): String {
         val lowerLang = lang.lowercase()
