@@ -174,7 +174,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         }
     }
 
-    private var currentSentenceIndex: Int = -1
+    @Volatile private var currentSentenceIndex: Int = -1
     private var cachedBookPath: String? = null
 
     companion object {
