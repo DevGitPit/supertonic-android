@@ -23,12 +23,9 @@ class TextNormalizer {
         private val RANGE_PATTERN = Pattern.compile("\\b(\\d+)\\s*[-–—]\\s*(\\d+)\\b")
         private val CURRENCY_PATTERN = Pattern.compile("(?:\\bINR|₹)\\s*(\\d+(?:\\.\\d+)?)\\b")
         private val PERCENT_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*%")
-    }
 
-    private val currencyNormalizer = CurrencyNormalizer()
-    
-    data class Rule(val pattern: Pattern, val replacement: (java.util.regex.Matcher) -> String)
-    private val rules: List<Rule> = initializeRules()
+        data class Rule(val pattern: Pattern, val replacement: (java.util.regex.Matcher) -> String)
+        private val rules: List<Rule> = initializeRules()
 
     private fun initializeRules(): List<Rule> {
         val rulesList = mutableListOf<Rule>()
@@ -224,6 +221,9 @@ class TextNormalizer {
             else -> "${num}th"
         }
     }
+    }
+
+    private val currencyNormalizer = CurrencyNormalizer()
 
     fun normalize(text: String, lang: String = "en", isAdvancedEnabled: Boolean = false): String {
         val lowerLang = lang.lowercase()
