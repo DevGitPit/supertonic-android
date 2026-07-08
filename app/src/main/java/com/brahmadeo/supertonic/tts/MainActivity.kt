@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.IBinder
 import android.util.Log
 import android.widget.Toast
@@ -213,6 +214,7 @@ class MainActivity : ComponentActivity() {
 
         loadPreferences()
         checkNotificationPermission()
+        migrateSavedAudioFiles()
 
         val bindIntent = Intent(this, PlaybackService::class.java)
         bindService(bindIntent, connection, BIND_AUTO_CREATE)
@@ -958,6 +960,49 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) { }
             unbindService(connection)
             isBound = false
+        }
+    }
+
+    private fun migrateSavedAudioFiles() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val oldMusicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+                val oldAppDir = File(oldMusicDir, "Supertonic Audio")
+                val newAppDir = getExternalFilesDir(Environment.DIRECTORY_MUSIC)
+                
+                if (oldAppDir.exists() && oldAppDir.isDirectory && newAppDir != null) {
+                    if (!newAppDir.exists()) {
+                        newAppDir.mkdirs()
+                    }
+                    val files = oldAppDir.listFiles()
+                    if (files != null) {
+                        for (file in files) {
+                            if (file.isFile && file.name.endsWith(".wav")) {
+                                val destFile = File(newAppDir, file.name)
+                                val success = file.renameTo(destFile)
+                                if (!success) {
+                                    try {
+                                        file.inputStream().use { input ->
+                                            destFile.outputStream().use { output ->
+                                                input.copyTo(output)
+                                            }
+                                        }
+                                        file.delete()
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    val remainingFiles = oldAppDir.listFiles()
+                    if (remainingFiles == null || remainingFiles.isEmpty()) {
+                        oldAppDir.delete()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 }

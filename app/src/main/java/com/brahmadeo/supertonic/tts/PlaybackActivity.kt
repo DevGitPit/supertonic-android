@@ -518,8 +518,7 @@ class PlaybackActivity : ComponentActivity() {
         isExportingState.value = true
 
         val filename = getExportFileName(currentText)
-        val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-        val appDir = File(musicDir, "Supertonic Audio")
+        val appDir = getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: File(filesDir, "Music")
         if (!appDir.exists()) appDir.mkdirs()
         val file = File(appDir, filename)
 

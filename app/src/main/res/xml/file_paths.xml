@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <external-path name="external_music" path="Music/" />
+    <external-files-path name="external_files_music" path="Music/" />
     <cache-path name="cache_tts" path="tts_output/" />
 </paths>

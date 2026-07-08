@@ -1,20 +1,26 @@
 package com.brahmadeo.supertonic.tts.ui
 
 import android.os.Environment
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,14 +34,20 @@ import java.util.Locale
 @Composable
 fun SavedAudioScreen(
     onBackClick: () -> Unit,
-    onPlayAudio: (File) -> Unit
+    onPlayAudio: (File) -> Unit,
+    onShareAudio: (List<File>) -> Unit
 ) {
     var files by remember { mutableStateOf(emptyList<File>()) }
-    var fileToDelete by remember { mutableStateOf<File?>(null) }
+    var filesToDelete by remember { mutableStateOf<List<File>>(emptyList()) }
+
+    val context = LocalContext.current
+
+    // Selection State
+    var isSelectionMode by remember { mutableStateOf(false) }
+    val selectedFiles = remember { mutableStateListOf<File>() }
 
     fun loadFiles() {
-        val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-        val appDir = File(musicDir, "Supertonic Audio")
+        val appDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: File(context.filesDir, "Music")
         if (appDir.exists()) {
             files = appDir.listFiles { _, name -> name.endsWith(".wav") }
                 ?.sortedByDescending { it.lastModified() }
@@ -43,30 +55,41 @@ fun SavedAudioScreen(
         } else {
             files = emptyList()
         }
+        // Clear selection on reload
+        selectedFiles.clear()
+        isSelectionMode = false
     }
 
     LaunchedEffect(Unit) {
         loadFiles()
     }
 
-    if (fileToDelete != null) {
+    if (filesToDelete.isNotEmpty()) {
         AlertDialog(
-            onDismissRequest = { fileToDelete = null },
+            onDismissRequest = { filesToDelete = emptyList() },
             title = { Text("Delete Audio") },
-            text = { Text("Are you sure you want to delete ${fileToDelete?.name}?") },
+            text = {
+                Text(
+                    if (filesToDelete.size == 1) {
+                        "Are you sure you want to delete ${filesToDelete[0].name}?"
+                    } else {
+                        "Are you sure you want to delete ${filesToDelete.size} audio files?"
+                    }
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        fileToDelete?.delete()
+                        filesToDelete.forEach { it.delete() }
                         loadFiles()
-                        fileToDelete = null
+                        filesToDelete = emptyList()
                     }
                 ) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { fileToDelete = null }) {
+                TextButton(onClick = { filesToDelete = emptyList() }) {
                     Text("Cancel")
                 }
             }
@@ -75,18 +98,70 @@ fun SavedAudioScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Saved Audio") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+            if (isSelectionMode) {
+                TopAppBar(
+                    title = { Text("${selectedFiles.size} selected") },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = {
+                                selectedFiles.clear()
+                                isSelectionMode = false
+                            }
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Cancel selection")
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = {
+                                if (selectedFiles.size == files.size) {
+                                    selectedFiles.clear()
+                                } else {
+                                    selectedFiles.clear()
+                                    selectedFiles.addAll(files)
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.SelectAll, contentDescription = "Select all")
+                        }
+                        IconButton(
+                            enabled = selectedFiles.isNotEmpty(),
+                            onClick = {
+                                onShareAudio(selectedFiles.toList())
+                            }
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = "Share selected")
+                        }
+                        IconButton(
+                            enabled = selectedFiles.isNotEmpty(),
+                            onClick = {
+                                filesToDelete = selectedFiles.toList()
+                            }
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete selected")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 )
-            )
+            } else {
+                TopAppBar(
+                    title = { Text("Saved Audio") },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    )
+                )
+            }
         }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
@@ -99,13 +174,37 @@ fun SavedAudioScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(files, key = { it.absolutePath }) { file ->
+                        val isSelected = selectedFiles.contains(file)
                         SwipeToDeleteAudioContainer(
-                            onDelete = { fileToDelete = file }
+                            enabled = !isSelectionMode,
+                            onDelete = { filesToDelete = listOf(file) }
                         ) {
                             SavedAudioItem(
                                 file = file,
+                                isSelectionMode = isSelectionMode,
+                                isSelected = isSelected,
                                 onPlay = { onPlayAudio(file) },
-                                onDelete = { fileToDelete = file }
+                                onShare = { onShareAudio(listOf(file)) },
+                                onItemClick = {
+                                    if (isSelectionMode) {
+                                        if (isSelected) {
+                                            selectedFiles.remove(file)
+                                            if (selectedFiles.isEmpty()) {
+                                                isSelectionMode = false
+                                            }
+                                        } else {
+                                            selectedFiles.add(file)
+                                        }
+                                    } else {
+                                        onPlayAudio(file)
+                                    }
+                                },
+                                onItemLongClick = {
+                                    if (!isSelectionMode) {
+                                        isSelectionMode = true
+                                        selectedFiles.add(file)
+                                    }
+                                }
                             )
                         }
                     }
@@ -118,9 +217,15 @@ fun SavedAudioScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeToDeleteAudioContainer(
+    enabled: Boolean,
     onDelete: () -> Unit,
     content: @Composable () -> Unit
 ) {
+    if (!enabled) {
+        content()
+        return
+    }
+
     val dismissState = rememberSwipeToDismissBoxState()
 
     LaunchedEffect(dismissState.targetValue) {
@@ -156,11 +261,16 @@ fun SwipeToDeleteAudioContainer(
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SavedAudioItem(
     file: File,
+    isSelectionMode: Boolean,
+    isSelected: Boolean,
     onPlay: () -> Unit,
-    onDelete: () -> Unit
+    onShare: () -> Unit,
+    onItemClick: () -> Unit,
+    onItemLongClick: () -> Unit
 ) {
     val dateString = remember(file.lastModified()) {
         SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(Date(file.lastModified()))
@@ -168,11 +278,20 @@ fun SavedAudioItem(
 
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            }
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onItemClick,
+                onLongClick = onItemLongClick
+            )
     ) {
         Row(
             modifier = Modifier
@@ -180,13 +299,22 @@ fun SavedAudioItem(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.AudioFile,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
+            if (isSelectionMode) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onItemClick() },
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            } else {
+                Icon(
+                    Icons.Default.AudioFile,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+            }
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = file.name,
@@ -202,12 +330,21 @@ fun SavedAudioItem(
                 )
             }
 
-            IconButton(onClick = onPlay) {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = "Play",
-                    tint = MaterialTheme.colorScheme.primary
-                )
+            if (!isSelectionMode) {
+                IconButton(onClick = onShare) {
+                    Icon(
+                        Icons.Default.Share,
+                        contentDescription = "Share",
+                        tint = MaterialTheme.colorScheme.outline
+                    )
+                }
+                IconButton(onClick = onPlay) {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = "Play",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }
