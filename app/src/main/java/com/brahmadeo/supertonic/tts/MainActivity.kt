@@ -964,17 +964,26 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun migrateSavedAudioFiles() {
+        val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+        if (prefs.getBoolean("audio_migration_done", false)) return
+
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val oldMusicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
                 val oldAppDir = File(oldMusicDir, "Supertonic Audio")
                 val newAppDir = getExternalFilesDir(Environment.DIRECTORY_MUSIC)
                 
-                if (oldAppDir.exists() && oldAppDir.isDirectory && newAppDir != null) {
+                if (!oldAppDir.exists()) {
+                    prefs.edit { putBoolean("audio_migration_done", true) }
+                    return@launch
+                }
+
+                if (oldAppDir.isDirectory && newAppDir != null) {
                     if (!newAppDir.exists()) {
                         newAppDir.mkdirs()
                     }
                     val files = oldAppDir.listFiles()
+                    var migrationSuccessful = true
                     if (files != null) {
                         for (file in files) {
                             if (file.isFile && file.name.endsWith(".wav")) {
@@ -987,17 +996,23 @@ class MainActivity : ComponentActivity() {
                                                 input.copyTo(output)
                                             }
                                         }
-                                        file.delete()
+                                        if (!file.delete()) {
+                                            migrationSuccessful = false
+                                        }
                                     } catch (e: Exception) {
                                         e.printStackTrace()
+                                        migrationSuccessful = false
                                     }
                                 }
                             }
                         }
                     }
-                    val remainingFiles = oldAppDir.listFiles()
-                    if (remainingFiles == null || remainingFiles.isEmpty()) {
-                        oldAppDir.delete()
+                    if (migrationSuccessful) {
+                        val remainingFiles = oldAppDir.listFiles()
+                        if (remainingFiles == null || remainingFiles.isEmpty()) {
+                            oldAppDir.delete()
+                        }
+                        prefs.edit { putBoolean("audio_migration_done", true) }
                     }
                 }
             } catch (e: Exception) {

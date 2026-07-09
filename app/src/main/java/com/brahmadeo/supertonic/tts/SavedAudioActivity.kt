@@ -49,6 +49,7 @@ class SavedAudioActivity : ComponentActivity() {
                     type = "audio/*"
                     val uri = FileProvider.getUriForFile(this@SavedAudioActivity, "${packageName}.fileprovider", files[0])
                     putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = android.content.ClipData.newRawUri("", uri)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
             } else {
@@ -58,6 +59,13 @@ class SavedAudioActivity : ComponentActivity() {
                         FileProvider.getUriForFile(this@SavedAudioActivity, "${packageName}.fileprovider", it)
                     })
                     putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                    if (uris.isNotEmpty()) {
+                        val clip = android.content.ClipData.newRawUri("", uris[0])
+                        for (i in 1 until uris.size) {
+                            clip.addItem(android.content.ClipData.Item(uris[i]))
+                        }
+                        clipData = clip
+                    }
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
             }

@@ -21,6 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,19 +48,24 @@ fun SavedAudioScreen(
     // Selection State
     var isSelectionMode by remember { mutableStateOf(false) }
     val selectedFiles = remember { mutableStateListOf<File>() }
+    val coroutineScope = rememberCoroutineScope()
 
     fun loadFiles() {
-        val appDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: File(context.filesDir, "Music")
-        if (appDir.exists()) {
-            files = appDir.listFiles { _, name -> name.endsWith(".wav") }
-                ?.sortedByDescending { it.lastModified() }
-                ?.toList() ?: emptyList()
-        } else {
-            files = emptyList()
-        }
-        // Clear selection on reload
         selectedFiles.clear()
         isSelectionMode = false
+        coroutineScope.launch(Dispatchers.IO) {
+            val appDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: File(context.filesDir, "Music")
+            val loadedFiles = if (appDir.exists()) {
+                appDir.listFiles { _, name -> name.endsWith(".wav") }
+                    ?.sortedByDescending { it.lastModified() }
+                    ?.toList() ?: emptyList()
+            } else {
+                emptyList()
+            }
+            withContext(Dispatchers.Main) {
+                files = loadedFiles
+            }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -80,9 +88,13 @@ fun SavedAudioScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        filesToDelete.forEach { it.delete() }
-                        loadFiles()
-                        filesToDelete = emptyList()
+                        coroutineScope.launch(Dispatchers.IO) {
+                            filesToDelete.forEach { it.delete() }
+                            withContext(Dispatchers.Main) {
+                                loadFiles()
+                                filesToDelete = emptyList()
+                            }
+                        }
                     }
                 ) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)
