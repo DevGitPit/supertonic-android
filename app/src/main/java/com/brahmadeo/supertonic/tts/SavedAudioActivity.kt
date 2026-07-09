@@ -70,7 +70,7 @@ class SavedAudioActivity : ComponentActivity() {
                 }
             }
 
-            val chooser = Intent.createChooser(intent, if (files.size == 1) "Share audio file" else "Share audio files")
+            val chooser = Intent.createChooser(intent, if (files.size == 1) getString(R.string.share_audio_file) else getString(R.string.share_audio_files))
             startActivity(chooser)
         } catch (e: Exception) {
             e.printStackTrace()

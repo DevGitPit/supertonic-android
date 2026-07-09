@@ -29,6 +29,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.io.File
+import androidx.compose.ui.res.stringResource
+import com.brahmadeo.supertonic.tts.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -75,21 +77,22 @@ fun SavedAudioScreen(
     if (filesToDelete.isNotEmpty()) {
         AlertDialog(
             onDismissRequest = { filesToDelete = emptyList() },
-            title = { Text("Delete Audio") },
+            title = { Text(stringResource(R.string.delete_audio_title)) },
             text = {
                 Text(
                     if (filesToDelete.size == 1) {
-                        "Are you sure you want to delete ${filesToDelete[0].name}?"
+                        stringResource(R.string.delete_audio_confirm_single, filesToDelete[0].name)
                     } else {
-                        "Are you sure you want to delete ${filesToDelete.size} audio files?"
+                        stringResource(R.string.delete_audio_confirm_multiple, filesToDelete.size)
                     }
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
+                        val targets = filesToDelete
                         coroutineScope.launch(Dispatchers.IO) {
-                            filesToDelete.forEach { it.delete() }
+                            targets.forEach { it.delete() }
                             withContext(Dispatchers.Main) {
                                 loadFiles()
                                 filesToDelete = emptyList()
@@ -97,12 +100,12 @@ fun SavedAudioScreen(
                         }
                     }
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { filesToDelete = emptyList() }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )

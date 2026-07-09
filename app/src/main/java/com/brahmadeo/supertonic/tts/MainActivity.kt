@@ -971,19 +971,19 @@ class MainActivity : ComponentActivity() {
             try {
                 val oldMusicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
                 val oldAppDir = File(oldMusicDir, "Supertonic Audio")
-                val newAppDir = getExternalFilesDir(Environment.DIRECTORY_MUSIC)
+                val newAppDir = getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: File(filesDir, "Music")
                 
                 if (!oldAppDir.exists()) {
                     prefs.edit { putBoolean("audio_migration_done", true) }
                     return@launch
                 }
 
-                if (oldAppDir.isDirectory && newAppDir != null) {
+                if (oldAppDir.isDirectory) {
                     if (!newAppDir.exists()) {
                         newAppDir.mkdirs()
                     }
                     val files = oldAppDir.listFiles()
-                    var migrationSuccessful = true
+                    var migrationSuccessful = files != null
                     if (files != null) {
                         for (file in files) {
                             if (file.isFile && file.name.endsWith(".wav")) {

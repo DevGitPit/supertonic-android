@@ -68,6 +68,10 @@
     <string name="saved_audio_title">Saved Audio</string>
     <string name="delete_audio_title">Delete Audio</string>
     <string name="delete_audio_message_fmt">Are you sure you want to delete %1$s?</string>
+    <string name="delete_audio_confirm_single">Are you sure you want to delete %1$s?</string>
+    <string name="delete_audio_confirm_multiple">Are you sure you want to delete %1$d audio files?</string>
+    <string name="share_audio_file">Share audio file</string>
+    <string name="share_audio_files">Share audio files</string>
 
     <!-- Lexicon Activity -->
     <string name="lexicon_title">Pronunciation Dictionary</string>
