@@ -169,4 +169,12 @@
     <string name="voice_f3">Jessica - Professional, Clear</string>
     <string name="voice_f4">Olivia - Crisp, Confident</string>
     <string name="voice_f5">Emily - Kind, Gentle</string>
+
+    <!-- Sibilance Reduction / De-Esser -->
+    <string name="sibilance_off">Off</string>
+    <string name="sibilance_deesser_recommended">Dynamic De-Esser (Recommended)</string>
+    <string name="sibilance_high_shelf">High-Shelf Cut (-3.5dB)</string>
+    <string name="sibilance_low_pass">Gentle Low-Pass (8.0kHz)</string>
+    <string name="sibilance_deesser_aggressive">Dynamic De-Esser (Aggressive)</string>
+    <string name="sibilance_reduction_label">Sibilance Reduction / De-Esser</string>
 </resources>

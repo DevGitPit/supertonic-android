@@ -356,16 +356,16 @@ fun MainScreen(
                         )
 
                         val sibilanceOptions = listOf(
-                            "Off",
-                            "Dynamic De-Esser (Recommended)",
-                            "High-Shelf Cut (-3.5dB)",
-                            "Gentle Low-Pass (8.0kHz)",
-                            "Dynamic De-Esser (Aggressive)"
+                            stringResource(AppR.string.sibilance_off),
+                            stringResource(AppR.string.sibilance_deesser_recommended),
+                            stringResource(AppR.string.sibilance_high_shelf),
+                            stringResource(AppR.string.sibilance_low_pass),
+                            stringResource(AppR.string.sibilance_deesser_aggressive)
                         )
                         DropdownSelector(
-                            label = "Sibilance Reduction / De-Esser",
+                            label = stringResource(AppR.string.sibilance_reduction_label),
                             options = sibilanceOptions,
-                            selectedOption = sibilanceOptions.getOrElse(sibilanceMode) { "Off" },
+                            selectedOption = sibilanceOptions.getOrElse(sibilanceMode) { sibilanceOptions[0] },
                             onOptionSelected = { selected ->
                                 val index = sibilanceOptions.indexOf(selected)
                                 if (index >= 0) {

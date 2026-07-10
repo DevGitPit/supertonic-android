@@ -17,6 +17,8 @@ pub struct BiquadFilter {
 
 impl BiquadFilter {
     pub fn new_low_pass(sample_rate: f32, cutoff: f32) -> Self {
+        // Clamp cutoff to prevent instability or division by zero near or above Nyquist frequency
+        let cutoff = cutoff.clamp(1.0, sample_rate * 0.49);
         // Butterworth low-pass filter (Q = 0.7071)
         let w0 = 2.0 * std::f32::consts::PI * cutoff / sample_rate;
         let sin_w0 = w0.sin();
@@ -44,6 +46,8 @@ impl BiquadFilter {
     }
 
     pub fn new_high_pass(sample_rate: f32, cutoff: f32) -> Self {
+        // Clamp cutoff to prevent instability or division by zero near or above Nyquist frequency
+        let cutoff = cutoff.clamp(1.0, sample_rate * 0.49);
         // Butterworth high-pass filter (Q = 0.7071)
         let w0 = 2.0 * std::f32::consts::PI * cutoff / sample_rate;
         let sin_w0 = w0.sin();
@@ -71,6 +75,8 @@ impl BiquadFilter {
     }
 
     pub fn new_high_shelf(sample_rate: f32, cutoff: f32, gain_db: f32) -> Self {
+        // Clamp cutoff to prevent instability or division by zero near or above Nyquist frequency
+        let cutoff = cutoff.clamp(1.0, sample_rate * 0.49);
         let a_db = 10.0f32.powf(gain_db / 40.0);
         let w0 = 2.0 * std::f32::consts::PI * cutoff / sample_rate;
         let sin_w0 = w0.sin();
@@ -99,6 +105,8 @@ impl BiquadFilter {
     }
 
     pub fn new_band_pass(sample_rate: f32, center_freq: f32, q: f32) -> Self {
+        // Clamp center_freq to prevent instability or division by zero near or above Nyquist frequency
+        let center_freq = center_freq.clamp(1.0, sample_rate * 0.49);
         let w0 = 2.0 * std::f32::consts::PI * center_freq / sample_rate;
         let sin_w0 = w0.sin();
         let cos_w0 = w0.cos();
@@ -325,7 +333,12 @@ pub struct FilterPipeline {
 }
 
 impl FilterPipeline {
-    pub fn new(mode: i32, sample_rate: f32) -> Self {
+    pub fn new(mode: i32, mut sample_rate: f32) -> Self {
+        // Ensure sample_rate is positive and valid to prevent division by zero or negative exponents
+        if sample_rate <= 0.0 {
+            sample_rate = 24000.0;
+        }
+
         // Enable the noise gate if sibilance reduction mode is active (not Off)
         // Set threshold at -46dB (0.005)
         let gate = if mode != 0 {
