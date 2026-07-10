@@ -363,9 +363,10 @@ class SupertonicTextToSpeechService : TextToSpeechService() {
                 if (SupertonicTTS.isCancelled()) { success = false; break }
 
                 val isAdvancedEnabled = prefs.getBoolean("is_advanced_normalization", false)
+                val sibilanceMode = prefs.getInt("sibilance_reduction_mode", 1)
                 val normalizedText = textNormalizer.normalize(sentence, requestedLang, isAdvancedEnabled)
 
-                val audioData = SupertonicTTS.generateAudio(normalizedText, requestedLang, stylePath, effectiveSpeed, 0.0f, steps, VOLUME_BOOST_FACTOR, null)
+                val audioData = SupertonicTTS.generateAudio(normalizedText, requestedLang, stylePath, effectiveSpeed, 0.0f, steps, VOLUME_BOOST_FACTOR, null, sibilanceMode)
 
                 if (audioData != null && audioData.isNotEmpty()) {
                     var offset = 0

@@ -514,6 +514,15 @@ class MainActivity : ComponentActivity() {
                             }
                         },
 
+                        sibilanceMode = viewModel.sibilanceMode.intValue,
+                        onSibilanceModeChange = { mode ->
+                            viewModel.sibilanceMode.intValue = mode
+                            SupertonicTTS.sibilanceMode = mode
+                            getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).edit {
+                                putInt("sibilance_reduction_mode", mode)
+                            }
+                        },
+
                         onResetClick = {
                             viewModel.inputText.value = ""
                             val stopIntent = Intent(this, PlaybackService::class.java).apply { action = "STOP_PLAYBACK" }
@@ -587,6 +596,9 @@ class MainActivity : ComponentActivity() {
         viewModel.currentSpeed.floatValue = prefs.getFloat("speed", MainViewModel.DEFAULT_SPEED)
         viewModel.currentSteps.intValue = prefs.getInt("diffusion_steps", MainViewModel.DEFAULT_STEPS)
         viewModel.isAdvancedNormalizationEnabled.value = prefs.getBoolean("is_advanced_normalization", false)
+        val sMode = prefs.getInt("sibilance_reduction_mode", 1)
+        viewModel.sibilanceMode.intValue = sMode
+        SupertonicTTS.sibilanceMode = sMode
     }
 
     private fun checkNotificationPermission() {

@@ -9,9 +9,11 @@ use std::path::{Path, PathBuf};
 mod helper;
 mod lang;
 mod thermal;
+mod filter;
 
 use helper::{load_text_to_speech, load_voice_style, load_and_mix_voice_styles, TextToSpeech};
 use thermal::{UnifiedThermalManager, SocClass};
+use filter::AudioFilter;
 
 struct SupertonicEngine {
     tts: TextToSpeech,
@@ -109,6 +111,7 @@ pub extern "system" fn Java_com_brahmadeo_supertonic_tts_SupertonicTTS_synthesiz
     buffer_seconds: jfloat,
     steps: jint,
     gain: jfloat,
+    sibilance_mode: jint,
 ) -> jbyteArray {
     // VULN-001 fix: Pointer validation
     if ptr == 0 {
@@ -164,6 +167,10 @@ pub extern "system" fn Java_com_brahmadeo_supertonic_tts_SupertonicTTS_synthesiz
     let start = Instant::now();
     let mut last_progress_call = Instant::now();
     
+    let sample_rate = engine.tts.sample_rate as f32;
+    let mut audio_filter = AudioFilter::new(sibilance_mode, sample_rate);
+    let mut audio_filter_callback = audio_filter.clone();
+
     let synthesis_result = engine.tts.call(&text, &lang, &style, steps as usize, speed, 0.1, |curr, total, audio_chunk| {
         // Check for cancellation
         let is_cancelled = match env.call_method(&instance, "isCancelled", "()Z", &[]) {
@@ -178,7 +185,8 @@ pub extern "system" fn Java_com_brahmadeo_supertonic_tts_SupertonicTTS_synthesiz
         if let Some(audio) = audio_chunk {
             let mut pcm_data = Vec::with_capacity(audio.len() * 2);
             for &sample in audio {
-                let clamped = (sample * gain).max(-1.0).min(1.0);
+                let filtered = audio_filter_callback.process(sample);
+                let clamped = (filtered * gain).max(-1.0).min(1.0);
                 let val = (clamped * 32767.0) as i16;
                 pcm_data.extend_from_slice(&val.to_le_bytes());
             }
@@ -218,7 +226,8 @@ pub extern "system" fn Java_com_brahmadeo_supertonic_tts_SupertonicTTS_synthesiz
 
             let mut pcm_data = Vec::with_capacity(wav_data.len() * 2);
             for &sample in &wav_data {
-                let clamped = (sample * gain).max(-1.0).min(1.0);
+                let filtered = audio_filter.process(sample);
+                let clamped = (filtered * gain).max(-1.0).min(1.0);
                 let val = (clamped * 32767.0) as i16;
                 pcm_data.extend_from_slice(&val.to_le_bytes());
             }

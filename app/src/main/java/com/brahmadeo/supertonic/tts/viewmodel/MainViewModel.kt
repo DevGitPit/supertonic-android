@@ -27,6 +27,7 @@ class MainViewModel : ViewModel() {
     var currentSpeed = mutableFloatStateOf(DEFAULT_SPEED)
     var currentSteps = mutableIntStateOf(DEFAULT_STEPS)
     var isAdvancedNormalizationEnabled = mutableStateOf(false)
+    var sibilanceMode = mutableIntStateOf(1) // 0: Off, 1: De-esser, 2: High-shelf, 3: Low-pass
 
     // Mini Player State
     var showMiniPlayer = mutableStateOf(false)

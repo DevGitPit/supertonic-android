@@ -26,7 +26,7 @@ object SupertonicTTS {
     }
 
     private external fun init(modelPath: String, libPath: String, ortThreads: Int, xnnThreads: Int): Long
-    private external fun synthesize(ptr: Long, text: String, lang: String, stylePath: String, speed: Float, bufferSeconds: Float, steps: Int, gain: Float): ByteArray
+    private external fun synthesize(ptr: Long, text: String, lang: String, stylePath: String, speed: Float, bufferSeconds: Float, steps: Int, gain: Float, sibilanceMode: Int): ByteArray
     private external fun getSocClass(ptr: Long): Int
     private external fun getSampleRate(ptr: Long): Int
     private external fun close(ptr: Long)
@@ -132,10 +132,23 @@ object SupertonicTTS {
     }
 
     @Volatile
+    var sibilanceMode: Int = 1 // 0: Off, 1: De-esser, 2: High-shelf, 3: Low-pass
+
+    @Volatile
     private var sessionIdCounter: Long = 0
 
     @Synchronized
-    fun generateAudio(text: String, lang: String, stylePath: String, speed: Float = 1.0f, bufferDuration: Float = 0.0f, steps: Int = 5, gain: Float = 1.0f, listener: ProgressListener? = null): ByteArray? {
+    fun generateAudio(
+        text: String,
+        lang: String,
+        stylePath: String,
+        speed: Float = 1.0f,
+        bufferDuration: Float = 0.0f,
+        steps: Int = 5,
+        gain: Float = 1.0f,
+        listener: ProgressListener? = null,
+        sibilanceMode: Int = this.sibilanceMode
+    ): ByteArray? {
         if (nativePtr == 0L) {
             Log.e("SupertonicTTS", "Engine not initialized")
             return null
@@ -145,7 +158,7 @@ object SupertonicTTS {
         currentSession.set(SessionContext(sid, listener))
         
         try {
-            val data = synthesize(nativePtr, text, lang, stylePath, speed, bufferDuration, steps, gain)
+            val data = synthesize(nativePtr, text, lang, stylePath, speed, bufferDuration, steps, gain, sibilanceMode)
             return if (data.isNotEmpty()) data else null
         } catch (e: Exception) {
             Log.e("SupertonicTTS", "Native synthesis exception: ${e.message}")

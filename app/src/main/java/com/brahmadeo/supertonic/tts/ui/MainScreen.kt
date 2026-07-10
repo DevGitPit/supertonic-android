@@ -71,6 +71,9 @@ fun MainScreen(
     isAdvancedNormalizationEnabled: Boolean,
     onAdvancedNormalizationEnabledChange: (Boolean) -> Unit,
 
+    sibilanceMode: Int,
+    onSibilanceModeChange: (Int) -> Unit,
+
     onResetClick: () -> Unit,
     onSavedAudioClick: () -> Unit,
     onHistoryClick: () -> Unit,
@@ -352,6 +355,24 @@ fun MainScreen(
                             displayValue = "$steps steps"
                         )
 
+                        val sibilanceOptions = listOf(
+                            "Off",
+                            "Dynamic De-Esser (Recommended)",
+                            "High-Shelf Cut (-4.5dB)",
+                            "Gentle Low-Pass (7.5kHz)"
+                        )
+                        DropdownSelector(
+                            label = "Sibilance Reduction / De-Esser",
+                            options = sibilanceOptions,
+                            selectedOption = sibilanceOptions.getOrElse(sibilanceMode) { "Off" },
+                            onOptionSelected = { selected ->
+                                val index = sibilanceOptions.indexOf(selected)
+                                if (index >= 0) {
+                                    onSibilanceModeChange(index)
+                                }
+                            }
+                        )
+
                         if (currentLangCode != "en" && currentLangCode != "ko") {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -572,6 +593,8 @@ fun MainScreenPreview() {
             onStepsChange = {},
             isAdvancedNormalizationEnabled = false,
             onAdvancedNormalizationEnabledChange = {},
+            sibilanceMode = 1,
+            onSibilanceModeChange = {},
             onResetClick = {},
             onSavedAudioClick = {},
             onHistoryClick = {},

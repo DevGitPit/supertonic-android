@@ -307,10 +307,11 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                         
                         val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
                         val isAdvancedEnabled = prefs.getBoolean("is_advanced_normalization", false)
+                        val sibilanceMode = prefs.getInt("sibilance_reduction_mode", 1)
                         val normalizedText = textNormalizer.normalize(sentence, sentenceLang, isAdvancedEnabled)
 
                         val audioData = SupertonicTTS.generateAudio(
-                            normalizedText, sentenceLang, stylePath, speed, 0.0f, steps, VOLUME_BOOST_FACTOR, null
+                            normalizedText, sentenceLang, stylePath, speed, 0.0f, steps, VOLUME_BOOST_FACTOR, null, sibilanceMode
                         )
                         
                         if (audioData != null && audioData.isNotEmpty()) {
@@ -734,9 +735,10 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
 
                         val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
                         val isAdvancedEnabled = prefs.getBoolean("is_advanced_normalization", false)
+                        val sibilanceMode = prefs.getInt("sibilance_reduction_mode", 1)
                         val normalizedText = textNormalizer.normalize(sentence, lang, isAdvancedEnabled)
 
-                        val audioData = SupertonicTTS.generateAudio(normalizedText, lang, stylePath, speed, 0.0f, steps, VOLUME_BOOST_FACTOR, null)
+                        val audioData = SupertonicTTS.generateAudio(normalizedText, lang, stylePath, speed, 0.0f, steps, VOLUME_BOOST_FACTOR, null, sibilanceMode)
                         if (audioData != null && audioData.isNotEmpty()) {
                             outputStream.write(audioData)
                         } else if (SupertonicTTS.isCancelled()) {
