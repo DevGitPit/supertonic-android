@@ -115,10 +115,12 @@ pub struct DeEsser {
     threshold: f32,
     attack_coeff: f32,
     release_coeff: f32,
+    sensitivity: f32,
+    max_attenuation: f32,
 }
 
 impl DeEsser {
-    pub fn new(sample_rate: f32, threshold: f32, center_freq: f32) -> Self {
+    pub fn new(sample_rate: f32, threshold: f32, center_freq: f32, sensitivity: f32, max_attenuation: f32) -> Self {
         let attack_ms = 2.0;
         let release_ms = 50.0;
         
@@ -132,6 +134,8 @@ impl DeEsser {
             threshold,
             attack_coeff,
             release_coeff,
+            sensitivity,
+            max_attenuation,
         }
     }
 
@@ -153,11 +157,11 @@ impl DeEsser {
         let mut gain = 1.0;
         if self.envelope > self.threshold {
             let over = self.envelope - self.threshold;
-            // Compress with a ratio factor (sensitivity = 30.0)
-            gain = 1.0 / (1.0 + 30.0 * over);
-            // Limit maximum attenuation to -12 dB (0.25)
-            if gain < 0.25 {
-                gain = 0.25;
+            // Compress with configured sensitivity ratio
+            gain = 1.0 / (1.0 + self.sensitivity * over);
+            // Limit maximum attenuation
+            if gain < self.max_attenuation {
+                gain = self.max_attenuation;
             }
         }
 
@@ -248,8 +252,8 @@ impl AudioFilter {
     pub fn new(mode: i32, sample_rate: f32) -> Self {
         match mode {
             1 => {
-                // De-esser: Center frequency 6000 Hz, threshold 0.015, sensitivity 30.0, max -12dB
-                Self::DeEsser(DeEsser::new(sample_rate, 0.015, 6000.0))
+                // De-esser: Center frequency 6000 Hz, threshold 0.015, sensitivity 30.0, max -12dB (0.25)
+                Self::DeEsser(DeEsser::new(sample_rate, 0.015, 6000.0, 30.0, 0.25))
             }
             2 => {
                 // High shelf: Cutoff 5500 Hz, -3.5 dB attenuation (gentle damping)
@@ -258,6 +262,11 @@ impl AudioFilter {
             3 => {
                 // Gentle low pass: Cutoff 8000 Hz (rolls off non-speech hiss)
                 Self::LowPass(BiquadFilter::new_low_pass(sample_rate, 8000.0))
+            }
+            4 => {
+                // Aggressive De-esser: Center frequency 5800 Hz, threshold 0.008, sensitivity 150.0, max -30dB (0.03)
+                // Reductions by ~2-3 magnitudes (a factor of 10 to 30 in amplitude) during sibilant letters
+                Self::DeEsser(DeEsser::new(sample_rate, 0.008, 5800.0, 150.0, 0.03))
             }
             _ => Self::None,
         }

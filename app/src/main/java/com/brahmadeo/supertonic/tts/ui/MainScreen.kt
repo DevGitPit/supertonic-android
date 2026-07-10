@@ -358,8 +358,9 @@ fun MainScreen(
                         val sibilanceOptions = listOf(
                             "Off",
                             "Dynamic De-Esser (Recommended)",
-                            "High-Shelf Cut (-4.5dB)",
-                            "Gentle Low-Pass (7.5kHz)"
+                            "High-Shelf Cut (-3.5dB)",
+                            "Gentle Low-Pass (8.0kHz)",
+                            "Dynamic De-Esser (Aggressive)"
                         )
                         DropdownSelector(
                             label = "Sibilance Reduction / De-Esser",
