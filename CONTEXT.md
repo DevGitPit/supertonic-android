@@ -10,6 +10,7 @@ Implemented sibilance reduction modes (De-Esser, High-Shelf, Low-Pass) in the TT
 * **Noise Gate**: Applied -46dB threshold (0.005) with 3ms attack, 30ms hold, and 80ms release to silence background vocoder hiss across all modes.
 * **JNI & UI Integration**: Added a selection dropdown in MainScreen and persisted settings via SharedPreferences.
 * **Termux Target Lock**: Configured local.properties to build only for `arm64` to match Termux's compiler.
+* **PR Stability & I18n Fixes**: Clamped filter cutoffs to `sample_rate * 0.49` to prevent biquad blow-ups near Nyquist limit. Guarded against uninitialized `sample_rate <= 0.0`. Localized sibilance dropdown strings in strings.xml.
 
 ## Next Steps
 * Test the de-esser on device speaker and headphones.
