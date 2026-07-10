@@ -43,6 +43,33 @@ impl BiquadFilter {
         }
     }
 
+    pub fn new_high_pass(sample_rate: f32, cutoff: f32) -> Self {
+        // Butterworth high-pass filter (Q = 0.7071)
+        let w0 = 2.0 * std::f32::consts::PI * cutoff / sample_rate;
+        let sin_w0 = w0.sin();
+        let cos_w0 = w0.cos();
+        let alpha = sin_w0 / 1.41421356; // Q = 0.7071
+
+        let b0 = (1.0 + cos_w0) / 2.0;
+        let b1 = -(1.0 + cos_w0);
+        let b2 = (1.0 + cos_w0) / 2.0;
+        let a0 = 1.0 + alpha;
+        let a1 = -2.0 * cos_w0;
+        let a2 = 1.0 - alpha;
+
+        Self {
+            b0: b0 / a0,
+            b1: b1 / a0,
+            b2: b2 / a0,
+            a1: a1 / a0,
+            a2: a2 / a0,
+            x1: 0.0,
+            x2: 0.0,
+            y1: 0.0,
+            y2: 0.0,
+        }
+    }
+
     pub fn new_high_shelf(sample_rate: f32, cutoff: f32, gain_db: f32) -> Self {
         let a_db = 10.0f32.powf(gain_db / 40.0);
         let w0 = 2.0 * std::f32::consts::PI * cutoff / sample_rate;
@@ -111,6 +138,7 @@ impl BiquadFilter {
 #[derive(Debug, Clone)]
 pub struct DeEsser {
     bandpass: BiquadFilter,
+    highpass: BiquadFilter,
     envelope: f32,
     threshold: f32,
     attack_coeff: f32,
@@ -130,6 +158,8 @@ impl DeEsser {
 
         Self {
             bandpass: BiquadFilter::new_band_pass(sample_rate, center_freq, 1.0),
+            // Highpass split cutoff set to 4500 Hz to isolate sibilant frequencies
+            highpass: BiquadFilter::new_high_pass(sample_rate, 4500.0),
             envelope: 0.0,
             threshold,
             attack_coeff,
@@ -141,7 +171,7 @@ impl DeEsser {
 
     #[inline]
     pub fn process(&mut self, input: f32) -> f32 {
-        // Detect sibilance band energy
+        // 1. Detect sibilance band energy
         let bandpassed = self.bandpass.process(input);
         let rect = bandpassed.abs();
 
@@ -153,19 +183,24 @@ impl DeEsser {
         };
         self.envelope = self.envelope + coeff * (rect - self.envelope);
 
-        // Apply attenuation if above threshold
+        // 2. Determine gain reduction
         let mut gain = 1.0;
         if self.envelope > self.threshold {
             let over = self.envelope - self.threshold;
-            // Compress with configured sensitivity ratio
             gain = 1.0 / (1.0 + self.sensitivity * over);
-            // Limit maximum attenuation
             if gain < self.max_attenuation {
                 gain = self.max_attenuation;
             }
         }
 
-        input * gain
+        // 3. Apply split-band compression:
+        // Isolate sibilant/treble frequencies (above 4.5 kHz)
+        let high_band = self.highpass.process(input);
+
+        // Subtract high band from full signal (gets low/mid band), sum back high band compressed
+        // output = (input - high_band) + (high_band * gain)
+        // output = input - high_band * (1.0 - gain)
+        input - high_band * (1.0 - gain)
     }
 }
 
@@ -252,7 +287,7 @@ impl AudioFilter {
     pub fn new(mode: i32, sample_rate: f32) -> Self {
         match mode {
             1 => {
-                // De-esser: Center frequency 6000 Hz, threshold 0.015, sensitivity 30.0, max -12dB (0.25)
+                // Split-band De-esser: Center 6000 Hz, threshold 0.015, sensitivity 30.0, max -12dB (0.25)
                 Self::DeEsser(DeEsser::new(sample_rate, 0.015, 6000.0, 30.0, 0.25))
             }
             2 => {
@@ -264,8 +299,8 @@ impl AudioFilter {
                 Self::LowPass(BiquadFilter::new_low_pass(sample_rate, 8000.0))
             }
             4 => {
-                // Aggressive De-esser: Center frequency 5800 Hz, threshold 0.008, sensitivity 150.0, max -30dB (0.03)
-                // Reductions by ~2-3 magnitudes (a factor of 10 to 30 in amplitude) during sibilant letters
+                // Aggressive Split-band De-esser: Center 5800 Hz, threshold 0.008, sensitivity 150.0, max -30dB (0.03)
+                // Reductions by ~2-3 magnitudes (a factor of 10 to 30 in amplitude) restricted ONLY to sibilant frequencies.
                 Self::DeEsser(DeEsser::new(sample_rate, 0.008, 5800.0, 150.0, 0.03))
             }
             _ => Self::None,
