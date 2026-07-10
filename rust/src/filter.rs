@@ -153,11 +153,11 @@ impl DeEsser {
         let mut gain = 1.0;
         if self.envelope > self.threshold {
             let over = self.envelope - self.threshold;
-            // Compress with a ratio factor (sensitivity = 20.0)
-            gain = 1.0 / (1.0 + 20.0 * over);
-            // Limit maximum attenuation to -12 dB (0.25)
-            if gain < 0.25 {
-                gain = 0.25;
+            // Compress with a ratio factor (sensitivity = 40.0)
+            gain = 1.0 / (1.0 + 40.0 * over);
+            // Limit maximum attenuation to -16.5 dB (0.15)
+            if gain < 0.15 {
+                gain = 0.15;
             }
         }
 
@@ -177,16 +177,16 @@ impl AudioFilter {
     pub fn new(mode: i32, sample_rate: f32) -> Self {
         match mode {
             1 => {
-                // De-esser: Center frequency 6000 Hz, threshold 0.02
-                Self::DeEsser(DeEsser::new(sample_rate, 0.02, 6000.0))
+                // De-esser: Center frequency 5500 Hz, threshold 0.012
+                Self::DeEsser(DeEsser::new(sample_rate, 0.012, 5500.0))
             }
             2 => {
-                // High shelf: Cutoff 5000 Hz, -4.5 dB attenuation
-                Self::HighShelf(BiquadFilter::new_high_shelf(sample_rate, 5000.0, -4.5))
+                // High shelf: Cutoff 4500 Hz, -7.0 dB attenuation
+                Self::HighShelf(BiquadFilter::new_high_shelf(sample_rate, 4500.0, -7.0))
             }
             3 => {
-                // Gentle low pass: Cutoff 7500 Hz
-                Self::LowPass(BiquadFilter::new_low_pass(sample_rate, 7500.0))
+                // Gentle low pass: Cutoff 6000 Hz
+                Self::LowPass(BiquadFilter::new_low_pass(sample_rate, 6000.0))
             }
             _ => Self::None,
         }
