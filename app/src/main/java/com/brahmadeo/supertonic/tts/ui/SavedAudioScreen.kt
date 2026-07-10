@@ -52,10 +52,8 @@ fun SavedAudioScreen(
     val selectedFiles = remember { mutableStateListOf<File>() }
     val coroutineScope = rememberCoroutineScope()
 
-    fun loadFiles() {
-        selectedFiles.clear()
-        isSelectionMode = false
-        coroutineScope.launch(Dispatchers.IO) {
+    suspend fun loadFiles() {
+        withContext(Dispatchers.IO) {
             val appDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: File(context.filesDir, "Music")
             val loadedFiles = if (appDir.exists()) {
                 appDir.listFiles { _, name -> name.endsWith(".wav") }
@@ -65,6 +63,8 @@ fun SavedAudioScreen(
                 emptyList()
             }
             withContext(Dispatchers.Main) {
+                selectedFiles.clear()
+                isSelectionMode = false
                 files = loadedFiles
             }
         }
@@ -93,8 +93,8 @@ fun SavedAudioScreen(
                         val targets = filesToDelete
                         coroutineScope.launch(Dispatchers.IO) {
                             targets.forEach { it.delete() }
+                            loadFiles()
                             withContext(Dispatchers.Main) {
-                                loadFiles()
                                 filesToDelete = emptyList()
                             }
                         }
@@ -115,7 +115,7 @@ fun SavedAudioScreen(
         topBar = {
             if (isSelectionMode) {
                 TopAppBar(
-                    title = { Text("${selectedFiles.size} selected") },
+                    title = { Text(stringResource(R.string.selected_count, selectedFiles.size)) },
                     navigationIcon = {
                         IconButton(
                             onClick = {
@@ -165,7 +165,7 @@ fun SavedAudioScreen(
                 )
             } else {
                 TopAppBar(
-                    title = { Text("Saved Audio") },
+                    title = { Text(stringResource(R.string.saved_audio_title)) },
                     navigationIcon = {
                         IconButton(onClick = onBackClick) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
