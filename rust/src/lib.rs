@@ -13,7 +13,7 @@ mod filter;
 
 use helper::{load_text_to_speech, load_voice_style, load_and_mix_voice_styles, TextToSpeech};
 use thermal::{UnifiedThermalManager, SocClass};
-use filter::AudioFilter;
+use filter::FilterPipeline;
 
 struct SupertonicEngine {
     tts: TextToSpeech,
@@ -168,7 +168,7 @@ pub extern "system" fn Java_com_brahmadeo_supertonic_tts_SupertonicTTS_synthesiz
     let mut last_progress_call = Instant::now();
     
     let sample_rate = engine.tts.sample_rate as f32;
-    let mut audio_filter = AudioFilter::new(sibilance_mode, sample_rate);
+    let mut audio_filter = FilterPipeline::new(sibilance_mode, sample_rate);
     let mut audio_filter_callback = audio_filter.clone();
 
     let synthesis_result = engine.tts.call(&text, &lang, &style, steps as usize, speed, 0.1, |curr, total, audio_chunk| {
