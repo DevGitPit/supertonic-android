@@ -157,16 +157,26 @@ class TextNormalizer {
             if (digit == "0") "two thousand" else "two thousand $digit"
         }
 
-        // Rule: 1900-1909
-        addLambda("\\b190(\\d)\\b") { m ->
-            val digit = m.group(1) ?: "0"
-            if (digit == "0") "nineteen hundred" else "nineteen oh $digit"
+        // Rule: 1500-1909
+        addLambda("\\b(1[5-9])0(\\d)\\b") { m ->
+            val century = m.group(1)?.toLongOrNull() ?: 19L
+            val centuryStr = NumberUtils.convert(century)
+            val digit = m.group(2) ?: "0"
+            if (digit == "0") "$centuryStr hundred" else "$centuryStr oh $digit"
         }
 
-        // YEARS (Split 4 digit years starting with 19 or 20)
-        addLambda("\\b(19|20)(\\d{2})\\b(?!s)") { m ->
+        // YEARS (Split 4 digit years starting with 15-20)
+        addLambda("\\b(1[5-9]|20)(\\d{2})\\b(?!s)") { m ->
             "${m.group(1)} ${m.group(2)}"
         }
+
+        // CENTURIES (e.g. 1800s -> eighteen hundreds)
+        addLambda("\\b(1[5-9])00s\\b") { m ->
+            val century = m.group(1)?.toLongOrNull() ?: 19L
+            val centuryStr = NumberUtils.convert(century)
+            "$centuryStr hundreds"
+        }
+        addStr("\\b2000s\\b", "two thousands")
 
         // TITLES
         addLambda("\\b(Prof|Dr|Mr|Mrs|Ms)\\.\\s+") { m ->

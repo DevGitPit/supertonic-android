@@ -205,6 +205,33 @@ class TextNormalizerTest {
     }
 
     @Test
+    fun testYearAndCenturyNormalization() {
+        val normalizer = TextNormalizer()
+        assertEquals("fifteen hundred", normalizer.normalize("1500", "en"))
+        assertEquals("fifteen oh six", normalizer.normalize("1506", "en"))
+        assertEquals("fifteen fifty six", normalizer.normalize("1556", "en"))
+        assertEquals("sixteen hundred", normalizer.normalize("1600", "en"))
+        assertEquals("sixteen forty two", normalizer.normalize("1642", "en"))
+        assertEquals("seventeen hundred", normalizer.normalize("1700", "en"))
+        assertEquals("seventeen ninety eight", normalizer.normalize("1798", "en"))
+        assertEquals("eighteen hundred", normalizer.normalize("1800", "en"))
+        assertEquals("eighteen oh five", normalizer.normalize("1805", "en"))
+        assertEquals("eighteen forty two", normalizer.normalize("1842", "en"))
+        assertEquals("nineteen hundred", normalizer.normalize("1900", "en"))
+        assertEquals("nineteen oh five", normalizer.normalize("1905", "en"))
+        assertEquals("nineteen ninety nine", normalizer.normalize("1999", "en"))
+        assertEquals("two thousand", normalizer.normalize("2000", "en"))
+        assertEquals("two thousand nine", normalizer.normalize("2009", "en"))
+        assertEquals("twenty twenty four", normalizer.normalize("2024", "en"))
+
+        // Centuries
+        assertEquals("fifteen hundreds", normalizer.normalize("1500s", "en"))
+        assertEquals("eighteen hundreds", normalizer.normalize("1800s", "en"))
+        assertEquals("nineteen hundreds", normalizer.normalize("1900s", "en"))
+        assertEquals("two thousands", normalizer.normalize("2000s", "en"))
+    }
+
+    @Test
     fun testSoftHyphenStripping() {
         val normalizer = TextNormalizer()
         // Unicode soft hyphen is \u00AD. Both words inherently and political contain soft hyphens.
