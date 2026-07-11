@@ -41,14 +41,17 @@ object NumberUtils {
     }
 
     fun convertDouble(d: Double): String {
+        if (d < 0) {
+            return "minus " + convertDouble(-d)
+        }
         val longVal = d.toLong()
         if (d == longVal.toDouble()) {
             return convert(longVal)
         }
-        val s = d.toString()
+        val s = java.math.BigDecimal.valueOf(d).toPlainString()
         val parts = s.split(".")
         if (parts.size == 2) {
-            val whole = convert(parts[0].toLong())
+            val whole = convert(parts[0].toLongOrNull() ?: longVal)
             val fraction = parts[1].map { 
                 if (it.isDigit()) units[it.digitToInt()] else "" 
             }.joinToString(" ")
@@ -148,14 +151,17 @@ object NumberUtils {
     }
 
     fun convertHindiDouble(d: Double): String {
+        if (d < 0) {
+            return "माइनस " + convertHindiDouble(-d)
+        }
         val longVal = d.toLong()
         if (d == longVal.toDouble()) {
             return convertHindi(longVal)
         }
-        val s = d.toString()
+        val s = java.math.BigDecimal.valueOf(d).toPlainString()
         val parts = s.split(".")
         if (parts.size == 2) {
-            val whole = convertHindi(parts[0].toLong())
+            val whole = convertHindi(parts[0].toLongOrNull() ?: longVal)
             val fraction = parts[1].map { 
                 if (it.isDigit()) {
                     val digit = it.digitToInt()
@@ -263,6 +269,9 @@ object NumberUtils {
     }
 
     fun convertBulgarianDouble(d: Double): String {
+        if (d < 0) {
+            return "минус " + convertBulgarianDouble(-d)
+        }
         val longVal = d.toLong()
         if (d == longVal.toDouble()) {
             return convertBulgarian(longVal)
@@ -330,6 +339,9 @@ object NumberUtils {
     }
 
     fun convertGermanDouble(d: Double): String {
+        if (d < 0) {
+            return "minus " + convertGermanDouble(-d)
+        }
         val longVal = d.toLong()
         if (d == longVal.toDouble()) {
             return convertGerman(longVal)

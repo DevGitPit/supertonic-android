@@ -28,6 +28,8 @@ class TextNormalizer {
         private val THOUSANDS_DOT_PATTERN = Pattern.compile("(?<=\\d)\\.(?=\\d{3}(?:\\D|$))")
         private val DECIMAL_COMMA_PATTERN = Pattern.compile("(?<=\\d),(?=\\d)")
 
+        private val NEGATIVE_SIGN_PATTERN = Pattern.compile("(?<=\\s|^|\\()[-–—−](?=\\d)")
+
         data class Rule(val pattern: Pattern, val replacement: (java.util.regex.Matcher) -> String)
         private val rules: List<Rule> = initializeRules()
 
@@ -272,9 +274,12 @@ class TextNormalizer {
             return processedText
         }
 
+        // Clean up negative signs: "-5" -> "minus 5"
+        val negativeNormalizedText = NEGATIVE_SIGN_PATTERN.matcher(processedText).replaceAll("minus ")
+
         // Normalize names like McDonald, MacDonald, FitzGerald to Mcdonald, Macdonald, Fitzgerald
         // to prevent them from being split by SMUSHED_WORD_PATTERN_1 and to ensure correct pronunciation.
-        val preparedText = NAME_PREFIX_REGEX.replace(processedText) { matchResult ->
+        val preparedText = NAME_PREFIX_REGEX.replace(negativeNormalizedText) { matchResult ->
             matchResult.groupValues[1] + matchResult.groupValues[2][0].lowercaseChar()
         }
 
@@ -336,8 +341,11 @@ class TextNormalizer {
     }
 
     private fun normalizeHindi(text: String): String {
+        // 0. Clean up negative signs
+        var normalized = NEGATIVE_SIGN_PATTERN.matcher(text).replaceAll("माइनस ")
+
         // 1. Convert Devanagari digits (०-९) to Latin digits (0-9)
-        var normalized = convertDevanagariDigits(text)
+        normalized = convertDevanagariDigits(normalized)
 
         // 2. Clean up commas in numbers (e.g. "1,50,000" -> "150000")
         normalized = COMMA_PATTERN.matcher(normalized).replaceAll("")
@@ -418,8 +426,11 @@ class TextNormalizer {
     }
 
     private fun normalizeBulgarian(text: String): String {
+        // 0. Clean up negative signs
+        var normalized = NEGATIVE_SIGN_PATTERN.matcher(text).replaceAll("минус ")
+
         // 1. Clean up thousands dot separators
-        var normalized = THOUSANDS_DOT_PATTERN.matcher(text).replaceAll("")
+        normalized = THOUSANDS_DOT_PATTERN.matcher(normalized).replaceAll("")
 
         // 2. Clean up decimal commas
         normalized = DECIMAL_COMMA_PATTERN.matcher(normalized).replaceAll(".")
@@ -488,8 +499,11 @@ class TextNormalizer {
     }
 
     private fun normalizeGerman(text: String): String {
+        // 0. Clean up negative signs
+        var normalized = NEGATIVE_SIGN_PATTERN.matcher(text).replaceAll("minus ")
+
         // 1. Clean up thousands dot separators
-        var normalized = THOUSANDS_DOT_PATTERN.matcher(text).replaceAll("")
+        normalized = THOUSANDS_DOT_PATTERN.matcher(normalized).replaceAll("")
 
         // 2. Clean up decimal commas
         normalized = DECIMAL_COMMA_PATTERN.matcher(normalized).replaceAll(".")

@@ -118,6 +118,7 @@ class TextNormalizerTest {
         
         // Decimal
         assertEquals("तिरेपन दशमलव तीन", normalizer.normalize("53.3", "hi"))
+        assertEquals("माइनस शून्य दशमलव तीन", normalizer.normalize("-0.3", "hi"))
         
         // Commas inside numbers
         assertEquals("एक लाख पचास हज़ार", normalizer.normalize("1,50,000", "hi"))
@@ -157,6 +158,7 @@ class TextNormalizerTest {
         // Decimals (with dot or comma)
         assertEquals("петдесет и три запетая три", normalizer.normalize("53.3", "bg"))
         assertEquals("петдесет и три запетая три", normalizer.normalize("53,3", "bg"))
+        assertEquals("минус нула запетая три", normalizer.normalize("-0.3", "bg"))
 
         // Thousands separator
         assertEquals("петнадесет хиляди", normalizer.normalize("15.000", "bg"))
@@ -192,6 +194,9 @@ class TextNormalizerTest {
         // Decimals (with dot or comma)
         assertEquals("dreiundfünfzig Komma drei", normalizer.normalize("53.3", "de"))
         assertEquals("dreiundfünfzig Komma drei", normalizer.normalize("53,3", "de"))
+        assertEquals("minus null Komma drei", normalizer.normalize("-0.3", "de"))
+        assertEquals("minus null Komma fünf", normalizer.normalize("-0.5", "de"))
+        assertEquals("minus null Komma eins", normalizer.normalize("-0.1", "de"))
 
         // Thousands separator
         assertEquals("fünfzehntausend", normalizer.normalize("15.000", "de"))
@@ -206,6 +211,13 @@ class TextNormalizerTest {
 
         // Ranges
         assertEquals("zehn bis fünfzehn", normalizer.normalize("10-15", "de"))
+    }
+
+    @Test
+    fun testEnglishNumberNormalization() {
+        val normalizer = TextNormalizer()
+        assertEquals("minus zero point three", normalizer.normalize("-0.3", "en"))
+        assertEquals("minus zero point one five", normalizer.normalize("-0.15", "en"))
     }
 
     @Test
