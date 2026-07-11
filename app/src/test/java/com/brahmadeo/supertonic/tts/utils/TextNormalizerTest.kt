@@ -165,8 +165,10 @@ class TextNormalizerTest {
 
         // Percentages
         assertEquals("един процент", normalizer.normalize("1%", "bg"))
+        assertEquals("два процента", normalizer.normalize("2%", "bg"))
         assertEquals("пет процента", normalizer.normalize("5%", "bg"))
         assertEquals("двадесет и един процент", normalizer.normalize("21%", "bg"))
+        assertEquals("двадесет и два процента", normalizer.normalize("22%", "bg"))
         assertEquals("единадесет процента", normalizer.normalize("11%", "bg"))
 
         // Ranges

@@ -468,7 +468,9 @@ class TextNormalizer {
                 else if (word.endsWith(" едно")) word.substring(0, word.length - 4) + "един"
                 else word
             } else {
-                word
+                if (word == "две") "два"
+                else if (word.endsWith(" две")) word.substring(0, word.length - 3) + "два"
+                else word
             }
             val replacement = "$adjustedWord $suffix"
             percentMatcher.appendReplacement(percentSb, replacement)
