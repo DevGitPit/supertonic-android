@@ -267,10 +267,10 @@ object NumberUtils {
         if (d == longVal.toDouble()) {
             return convertBulgarian(longVal)
         }
-        val s = d.toString()
+        val s = java.math.BigDecimal.valueOf(d).toPlainString()
         val parts = s.split(".")
         if (parts.size == 2) {
-            val whole = convertBulgarian(parts[0].toLong())
+            val whole = convertBulgarian(parts[0].toLongOrNull() ?: longVal)
             val fraction = parts[1].map {
                 if (it.isDigit()) BULGARIAN_FRACTION_DIGITS[it.digitToInt()] else ""
             }.filter { it.isNotEmpty() }.joinToString(" ")
@@ -334,10 +334,10 @@ object NumberUtils {
         if (d == longVal.toDouble()) {
             return convertGerman(longVal)
         }
-        val s = d.toString()
+        val s = java.math.BigDecimal.valueOf(d).toPlainString()
         val parts = s.split(".")
         if (parts.size == 2) {
-            val whole = convertGerman(parts[0].toLong())
+            val whole = convertGerman(parts[0].toLongOrNull() ?: longVal)
             val fraction = parts[1].map {
                 if (it.isDigit()) GERMAN_FRACTION_DIGITS[it.digitToInt()] else ""
             }.filter { it.isNotEmpty() }.joinToString(" ")
