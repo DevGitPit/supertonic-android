@@ -137,6 +137,74 @@ class TextNormalizerTest {
     }
 
     @Test
+    fun testBulgarianNumberNormalization() {
+        val normalizer = TextNormalizer()
+
+        // Integers
+        assertEquals("нула", normalizer.normalize("0", "bg"))
+        assertEquals("три", normalizer.normalize("3", "bg"))
+        assertEquals("двадесет", normalizer.normalize("20", "bg"))
+        assertEquals("двадесет и пет", normalizer.normalize("25", "bg"))
+        assertEquals("сто", normalizer.normalize("100", "bg"))
+        assertEquals("сто и пет", normalizer.normalize("105", "bg"))
+        assertEquals("сто двадесет и пет", normalizer.normalize("125", "bg"))
+        assertEquals("хиляда и пет", normalizer.normalize("1005", "bg"))
+        assertEquals("хиляда сто двадесет и пет", normalizer.normalize("1125", "bg"))
+        assertEquals("един милион", normalizer.normalize("1000000", "bg"))
+        assertEquals("един милион две хиляди и пет", normalizer.normalize("1002005", "bg"))
+        assertEquals("един милион и двадесет и пет хиляди", normalizer.normalize("1025000", "bg"))
+
+        // Decimals (with dot or comma)
+        assertEquals("петдесет и три запетая три", normalizer.normalize("53.3", "bg"))
+        assertEquals("петдесет и три запетая три", normalizer.normalize("53,3", "bg"))
+
+        // Thousands separator
+        assertEquals("петнадесет хиляди", normalizer.normalize("15.000", "bg"))
+
+        // Percentages
+        assertEquals("един процент", normalizer.normalize("1%", "bg"))
+        assertEquals("пет процента", normalizer.normalize("5%", "bg"))
+        assertEquals("двадесет и един процент", normalizer.normalize("21%", "bg"))
+        assertEquals("единадесет процента", normalizer.normalize("11%", "bg"))
+
+        // Ranges
+        assertEquals("десет до петнадесет", normalizer.normalize("10-15", "bg"))
+    }
+
+    @Test
+    fun testGermanNumberNormalization() {
+        val normalizer = TextNormalizer()
+
+        // Integers
+        assertEquals("null", normalizer.normalize("0", "de"))
+        assertEquals("drei", normalizer.normalize("3", "de"))
+        assertEquals("zwanzig", normalizer.normalize("20", "de"))
+        assertEquals("einundzwanzig", normalizer.normalize("21", "de"))
+        assertEquals("fünfundzwanzig", normalizer.normalize("25", "de"))
+        assertEquals("einhundert", normalizer.normalize("100", "de"))
+        assertEquals("einhundertfünf", normalizer.normalize("105", "de"))
+        assertEquals("einhundertfünfundzwanzig", normalizer.normalize("125", "de"))
+        assertEquals("eintausendfünf", normalizer.normalize("1005", "de"))
+        assertEquals("eintausendeinhundertfünfundzwanzig", normalizer.normalize("1125", "de"))
+        assertEquals("eine Million", normalizer.normalize("1000000", "de"))
+        assertEquals("zwei Millionen fünfhunderttausendeinhundertzwanzig", normalizer.normalize("2500120", "de"))
+
+        // Decimals (with dot or comma)
+        assertEquals("dreiundfünfzig Komma drei", normalizer.normalize("53.3", "de"))
+        assertEquals("dreiundfünfzig Komma drei", normalizer.normalize("53,3", "de"))
+
+        // Thousands separator
+        assertEquals("fünfzehntausend", normalizer.normalize("15.000", "de"))
+
+        // Percentages
+        assertEquals("ein Prozent", normalizer.normalize("1%", "de"))
+        assertEquals("fünf Prozent", normalizer.normalize("5%", "de"))
+
+        // Ranges
+        assertEquals("zehn bis fünfzehn", normalizer.normalize("10-15", "de"))
+    }
+
+    @Test
     fun testMcMacFitzNamesNormalization() {
         val normalizer = TextNormalizer()
         
