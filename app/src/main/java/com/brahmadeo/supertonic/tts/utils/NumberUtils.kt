@@ -301,18 +301,18 @@ object NumberUtils {
         if (n < 1000000) {
             val thousandVal = n / 1000
             val rem = n % 1000
-            val thousandStr = (if (thousandVal == 1L) "ein" else convertGerman(thousandVal)) + "tausend"
+            val thousandStr = (if (thousandVal == 1L) "ein" else convertGerman(thousandVal).let { if (it.endsWith("eins")) it.dropLast(1) else it }) + "tausend"
             return if (rem == 0L) thousandStr else thousandStr + convertGerman(rem)
         }
         if (n < 1000000000) {
             val millionVal = n / 1000000
             val rem = n % 1000000
-            val millionStr = if (millionVal == 1L) "eine Million" else convertGerman(millionVal) + " Millionen"
+            val millionStr = if (millionVal == 1L) "eine Million" else convertGerman(millionVal).let { if (it.endsWith("eins")) it.dropLast(1) else it } + " Millionen"
             return if (rem == 0L) millionStr else "$millionStr " + convertGerman(rem)
         }
         val billionVal = n / 1000000000
         val rem = n % 1000000000
-        val billionStr = if (billionVal == 1L) "eine Milliarde" else convertGerman(billionVal) + " Milliarden"
+        val billionStr = if (billionVal == 1L) "eine Milliarde" else convertGerman(billionVal).let { if (it.endsWith("eins")) it.dropLast(1) else it } + " Milliarden"
         return if (rem == 0L) billionStr else "$billionStr " + convertGerman(rem)
     }
 

@@ -517,7 +517,7 @@ class TextNormalizer {
             } else {
                 NumberUtils.convertGermanDouble(amount)
             }
-            val adjustedWord = if (word == "eins") "ein" else word
+            val adjustedWord = if (word.endsWith("eins")) word.dropLast(1) else word
             val replacement = "$adjustedWord Prozent"
             percentMatcher.appendReplacement(percentSb, replacement)
         }

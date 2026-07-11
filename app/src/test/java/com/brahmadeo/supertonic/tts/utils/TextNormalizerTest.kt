@@ -199,6 +199,10 @@ class TextNormalizerTest {
         // Percentages
         assertEquals("ein Prozent", normalizer.normalize("1%", "de"))
         assertEquals("fünf Prozent", normalizer.normalize("5%", "de"))
+        assertEquals("einhundertein Prozent", normalizer.normalize("101%", "de"))
+
+        // Prefix drops
+        assertEquals("einhunderteintausend", normalizer.normalize("101000", "de"))
 
         // Ranges
         assertEquals("zehn bis fünfzehn", normalizer.normalize("10-15", "de"))
