@@ -70,6 +70,31 @@ object NumberUtils {
         "इक्यानवे", "बानवे", "तिरानवे", "चौरानवे", "पंचानवे", "छियानवे", "सत्तानवे", "अट्ठानवे", "निन्यानवे"
     )
 
+    private val BULGARIAN_HUNDREDS = arrayOf(
+        "", "сто", "двеста", "триста", "четиристотин", "петстотин", "шестстотин", "седемстотин", "осемстотин", "деветстотин"
+    )
+
+    private val BULGARIAN_TENS = arrayOf(
+        "", "", "двадесет", "тридесет", "четиридесет", "петдесет", "шестдесет", "седемдесет", "осемдесет", "деветдесет"
+    )
+
+    private val BULGARIAN_FRACTION_DIGITS = arrayOf(
+        "нула", "едно", "две", "три", "четири", "пет", "шест", "седем", "осем", "девет"
+    )
+
+    private val GERMAN_0_TO_19 = arrayOf(
+        "null", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun", "zehn",
+        "elf", "zwölf", "dreizehn", "vierzehn", "fünfzehn", "sechzehn", "siebzehn", "achtzehn", "neunzehn"
+    )
+
+    private val GERMAN_TENS = arrayOf(
+        "", "", "zwanzig", "dreißig", "vierzig", "fünfzig", "sechzig", "siebzig", "achtzig", "neunzig"
+    )
+
+    private val GERMAN_FRACTION_DIGITS = arrayOf(
+        "null", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun"
+    )
+
     fun convertHindi(n: Long): String {
         if (n < 0) {
             if (n == Long.MIN_VALUE) {
@@ -216,15 +241,13 @@ object NumberUtils {
             }
         }
         if (hundreds > 0) {
-            val hundredsMap = arrayOf("", "сто", "двеста", "триста", "четиристотин", "петстотин", "шестстотин", "седемстотин", "осемстотин", "деветстотин")
-            parts.add(hundredsMap[hundreds.toInt()])
+            parts.add(BULGARIAN_HUNDREDS[hundreds.toInt()])
         }
         if (remainder > 0) {
             if (remainder < 20) {
                 parts.add(convertBulgarianInternal(remainder, gender))
             } else {
-                val tensMap = arrayOf("", "", "двадесет", "тридесет", "четиридесет", "петдесет", "шестдесет", "седемдесет", "осемдесет", "деветдесет")
-                parts.add(tensMap[(remainder / 10).toInt()])
+                parts.add(BULGARIAN_TENS[(remainder / 10).toInt()])
                 val ones = remainder % 10
                 if (ones > 0) {
                     parts.add(convertBulgarianInternal(ones, gender))
@@ -248,9 +271,8 @@ object NumberUtils {
         val parts = s.split(".")
         if (parts.size == 2) {
             val whole = convertBulgarian(parts[0].toLong())
-            val fractionDigits = arrayOf("нула", "едно", "две", "три", "четири", "пет", "шест", "седем", "осем", "девет")
             val fraction = parts[1].map {
-                if (it.isDigit()) fractionDigits[it.digitToInt()] else ""
+                if (it.isDigit()) BULGARIAN_FRACTION_DIGITS[it.digitToInt()] else ""
             }.filter { it.isNotEmpty() }.joinToString(" ")
             return "$whole запетая $fraction"
         }
@@ -296,28 +318,15 @@ object NumberUtils {
 
     private fun convertGermanUnder100(n: Int): String {
         if (n < 20) {
-            val german0to19 = arrayOf(
-                "null", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun", "zehn",
-                "elf", "zwölf", "dreizehn", "vierzehn", "fünfzehn", "sechzehn", "siebzehn", "achtzehn", "neunzehn"
-            )
-            return german0to19[n]
+            return GERMAN_0_TO_19[n]
         }
         val tensVal = n / 10
         val onesVal = n % 10
-        val germanTens = arrayOf(
-            "", "", "zwanzig", "dreißig", "vierzig", "fünfzig", "sechzig", "siebzig", "achtzig", "neunzig"
-        )
         if (onesVal == 0) {
-            return germanTens[tensVal]
+            return GERMAN_TENS[tensVal]
         }
-        val onesStr = if (onesVal == 1) "ein" else {
-            val german0to19 = arrayOf(
-                "null", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun", "zehn",
-                "elf", "zwölf", "dreizehn", "vierzehn", "fünfzehn", "sechzehn", "siebzehn", "achtzehn", "neunzehn"
-            )
-            german0to19[onesVal]
-        }
-        return onesStr + "und" + germanTens[tensVal]
+        val onesStr = if (onesVal == 1) "ein" else GERMAN_0_TO_19[onesVal]
+        return onesStr + "und" + GERMAN_TENS[tensVal]
     }
 
     fun convertGermanDouble(d: Double): String {
@@ -329,9 +338,8 @@ object NumberUtils {
         val parts = s.split(".")
         if (parts.size == 2) {
             val whole = convertGerman(parts[0].toLong())
-            val fractionDigits = arrayOf("null", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun")
             val fraction = parts[1].map {
-                if (it.isDigit()) fractionDigits[it.digitToInt()] else ""
+                if (it.isDigit()) GERMAN_FRACTION_DIGITS[it.digitToInt()] else ""
             }.filter { it.isNotEmpty() }.joinToString(" ")
             return "$whole Komma $fraction"
         }
