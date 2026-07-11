@@ -231,11 +231,14 @@ class TextNormalizer {
     fun normalize(text: String, lang: String = "en", isAdvancedEnabled: Boolean = false): String {
         val lowerLang = lang.lowercase()
         
+        // Remove soft hyphens (\u00AD) globally
+        val cleanText = text.replace("\u00AD", "")
+        
         // 1. Lexicon applies to all languages except Korean
         val processedText = if (lowerLang != "ko") {
-            LexiconManager.apply(text)
+            LexiconManager.apply(cleanText)
         } else {
-            text
+            cleanText
         }
 
         if (lowerLang.startsWith("hi")) {

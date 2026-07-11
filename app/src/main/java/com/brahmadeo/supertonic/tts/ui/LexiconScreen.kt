@@ -243,8 +243,8 @@ fun LexiconEditDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (term.isBlank() || replacement.isBlank()) {
-                        error = "Fields cannot be empty"
+                    if (term.isBlank()) {
+                        error = "Term cannot be empty"
                     } else {
                         onSave(term.trim(), replacement.trim(), ignoreCase, isRegex)
                     }

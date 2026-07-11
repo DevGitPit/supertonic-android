@@ -205,6 +205,15 @@ class TextNormalizerTest {
     }
 
     @Test
+    fun testSoftHyphenStripping() {
+        val normalizer = TextNormalizer()
+        // Unicode soft hyphen is \u00AD. Both words inherently and political contain soft hyphens.
+        val text = "in\u00ADher\u00ADent\u00ADly po\u00ADlit\u00ADi\u00ADcal"
+        val expected = "inherently political"
+        assertEquals(expected, normalizer.normalize(text, "en"))
+    }
+
+    @Test
     fun testMcMacFitzNamesNormalization() {
         val normalizer = TextNormalizer()
         
