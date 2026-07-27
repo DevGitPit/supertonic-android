@@ -1,6 +1,7 @@
 package com.brahmadeo.supertonic.tts.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,7 +10,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
@@ -49,10 +49,30 @@ fun PlaybackScreen(
     onSleepTimerClick: () -> Unit
 ) {
     val listState = rememberLazyListState()
+    val density = androidx.compose.ui.platform.LocalDensity.current
 
-    LaunchedEffect(currentIndex) {
+    val bottomPadding by animateDpAsState(
+        targetValue = if (isServiceActive || isPlaying) 210.dp else 140.dp,
+        label = "playback_bottom_padding"
+    )
+
+    // Auto-scroll to active sentence
+    LaunchedEffect(currentIndex, isServiceActive, isPlaying, bottomPadding) {
         if (currentIndex in sentences.indices) {
-            listState.animateScrollToItem(currentIndex)
+            val layoutInfo = listState.layoutInfo
+            val visibleInfo = layoutInfo.visibleItemsInfo
+            val activeItem = visibleInfo.find { it.index == currentIndex }
+
+            val bottomPaddingPx = with(density) { bottomPadding.toPx() }
+            val unobscuredEnd = layoutInfo.viewportEndOffset - bottomPaddingPx
+
+            val isObscured = activeItem == null ||
+                    activeItem.offset < layoutInfo.viewportStartOffset ||
+                    (activeItem.offset + activeItem.size) > unobscuredEnd
+
+            if (isObscured) {
+                listState.animateScrollToItem(currentIndex)
+            }
         }
     }
 
@@ -61,8 +81,16 @@ fun PlaybackScreen(
             TopAppBar(
                 title = { Text("Now Playing", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close"
+                        )
+                    }
+                },
+                actions = {
                     IconButton(onClick = onHomeClick) {
-                        Icon(Icons.Default.Home, contentDescription = "Home")
+                        Icon(imageVector = Icons.Default.Home, contentDescription = "Home")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -83,7 +111,7 @@ fun PlaybackScreen(
                     top = 16.dp,
                     start = 16.dp,
                     end = 16.dp,
-                    bottom = 140.dp
+                    bottom = bottomPadding
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize()

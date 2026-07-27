@@ -28,7 +28,7 @@ import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 
-class EbookParser(private val context: Context) {
+class EbookParser(context: Context) {
 
     private val httpClient = DefaultHttpClient()
     private val assetRetriever = AssetRetriever(context.contentResolver, httpClient)
@@ -147,7 +147,7 @@ class EbookParser(private val context: Context) {
     }
 
     suspend fun extractWebpageText(url: String): String = withContext(Dispatchers.IO) {
-        val doc = org.jsoup.Jsoup.connect(url)
+        val doc = Jsoup.connect(url)
             .userAgent("Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36")
             .timeout(10000)
             .get()
@@ -338,12 +338,6 @@ class EbookParser(private val context: Context) {
         }
     }
 
-    suspend fun extractPages(publication: Publication, pageIndices: List<Int>): Result<String> = withContext(Dispatchers.IO) {
-        val isPdf = publication.metadata.conformsTo.contains(Publication.Profile.PDF) ||
-                    publication.readingOrder.firstOrNull()?.mediaType?.matches(org.readium.r2.shared.util.mediatype.MediaType.PDF) == true
-
-        return@withContext extractPagesReadium(publication, pageIndices, isPdf)
-    }
 
     suspend fun extractPages(file: File, publication: Publication, pageIndices: List<Int>): Result<String> = withContext(Dispatchers.IO) {
         val isPdf = file.extension.lowercase() == "pdf" ||
@@ -353,7 +347,7 @@ class EbookParser(private val context: Context) {
         if (isPdf) {
             return@withContext extractPagesPdfBox(file, pageIndices)
         } else {
-            return@withContext extractPagesReadium(publication, pageIndices, isPdf)
+            return@withContext extractPagesReadium(publication, pageIndices, false)
         }
     }
 
@@ -428,7 +422,7 @@ class EbookParser(private val context: Context) {
             Log.e("EbookParser", "PDFBox extraction failed", e)
             Result.failure(e)
         } finally {
-            try { document?.close() } catch (e: Exception) {}
+            try { document?.close() } catch (_: Exception) {}
         }
     }
 
@@ -474,13 +468,13 @@ class EbookParser(private val context: Context) {
         
         // 3. Join single newlines into paragraphs (preserving spaces)
         // Join if line doesn't end in sentence punctuation and next char is a letter
-        cleaned = cleaned.replace(Regex("([^.!?\\-])\\s*\\r?\\n\\s*([\\p{L}])"), "$1 $2")
+        cleaned = cleaned.replace(Regex("([^.!?\\-])\\h*\\r?\\n\\h*(\\p{L})"), "$1 $2")
 
         // 4. Remove lone page numbers on their own lines
-        cleaned = cleaned.replace(Regex("(?m)^\\s*\\d+\\s*$"), "")
+        cleaned = cleaned.replace(Regex("(?m)^\\h*\\d+\\h*$"), "")
 
         // 5. Fix multiple spaces and excessive newlines
-        return cleaned.replace(Regex("[ ]{2,}"), " ")
+        return cleaned.replace(Regex(" {2,}"), " ")
             .replace(Regex("(\\n\\s*){3,}"), "\n\n")
             .trim()
     }

@@ -21,6 +21,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.Locale
+import kotlin.time.Duration.Companion.milliseconds
 
 class SupertonicTextToSpeechService : TextToSpeechService() {
 
@@ -296,7 +297,7 @@ class SupertonicTextToSpeechService : TextToSpeechService() {
         if (request == null || callback == null) return
         SupertonicTTS.setCancelled(false)
         runBlocking {
-            withTimeoutOrNull(5000) {
+            withTimeoutOrNull(5000.milliseconds) {
                 initJob?.join()
             }
         }

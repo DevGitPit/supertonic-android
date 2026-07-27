@@ -7,24 +7,10 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.IBinder
 import android.os.RemoteException
-import android.os.Build
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.core.content.edit
-import com.brahmadeo.supertonic.tts.service.IPlaybackListener
-import com.brahmadeo.supertonic.tts.service.IPlaybackService
-import com.brahmadeo.supertonic.tts.service.PlaybackService
-import com.brahmadeo.supertonic.tts.ui.PlaybackScreen
-import com.brahmadeo.supertonic.tts.ui.theme.SupertonicTheme
-import com.brahmadeo.supertonic.tts.utils.TextNormalizer
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,18 +22,25 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.lifecycleScope
-import com.brahmadeo.supertonic.tts.utils.EbookManager
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import com.brahmadeo.supertonic.tts.service.IPlaybackListener
+import com.brahmadeo.supertonic.tts.service.IPlaybackService
+import com.brahmadeo.supertonic.tts.service.PlaybackService
+import com.brahmadeo.supertonic.tts.ui.PlaybackScreen
+import com.brahmadeo.supertonic.tts.ui.theme.SupertonicTheme
 import com.brahmadeo.supertonic.tts.utils.EbookParser
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import org.readium.r2.shared.publication.services.positions
+import com.brahmadeo.supertonic.tts.utils.TextNormalizer
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class PlaybackActivity : ComponentActivity() {
 
@@ -228,7 +221,7 @@ class PlaybackActivity : ComponentActivity() {
                         onStopClick = { handleStop() },
                         onExportClick = { startExport() },
                         onCancelExportClick = {
-                            try { playbackService?.stop() } catch (e: Exception) {}
+                            try { playbackService?.stop() } catch (_: Exception) {}
                             if (isExportingState.value) {
                                 isExportingState.value = false
                                 Toast.makeText(this@PlaybackActivity, "Audio saving cancelled", Toast.LENGTH_SHORT).show()
@@ -340,7 +333,7 @@ class PlaybackActivity : ComponentActivity() {
     }
 
     private val playbackReceiver = object : android.content.BroadcastReceiver() {
-        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+        override fun onReceive(context: android.content.Context?, intent: Intent?) {
             when (intent?.action) {
                 "com.brahmadeo.supertonic.tts.SLEEP_TIMER_EXPIRED" -> {
                     finish()
@@ -354,11 +347,12 @@ class PlaybackActivity : ComponentActivity() {
         val filter = android.content.IntentFilter().apply {
             addAction("com.brahmadeo.supertonic.tts.SLEEP_TIMER_EXPIRED")
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(playbackReceiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(playbackReceiver, filter)
-        }
+        ContextCompat.registerReceiver(
+            this,
+            playbackReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
     override fun onStop() {
@@ -374,7 +368,7 @@ class PlaybackActivity : ComponentActivity() {
             Toast.makeText(this, "Playback service not ready", Toast.LENGTH_SHORT).show()
             return
         }
-        val currentSeconds = try { service.getSleepTimerSeconds() } catch (e: RemoteException) { 0 }
+        val currentSeconds = try { service.getSleepTimerSeconds() } catch (_: RemoteException) { 0 }
         val nextMinutes = when {
             currentSeconds == 0 -> 10
             currentSeconds <= 10 * 60 -> 20
@@ -423,7 +417,7 @@ class PlaybackActivity : ComponentActivity() {
     private fun handleStop() {
         try {
             playbackService?.stop()
-        } catch (e: RemoteException) { }
+        } catch (_: RemoteException) { }
         clearState()
         finish()
     }
@@ -477,9 +471,9 @@ class PlaybackActivity : ComponentActivity() {
     private fun restoreState() {
         try {
             if (playbackService?.isServiceActive == false) {
-                 playbackListenerStub.onStateChanged(false, true, false)
+                  playbackListenerStub.onStateChanged(false, true, false)
             }
-        } catch (e: RemoteException) { }
+        } catch (_: RemoteException) { }
     }
 
     private fun getExportFileName(text: String): String {
@@ -536,7 +530,7 @@ class PlaybackActivity : ComponentActivity() {
         if (isBound) {
             try {
                 playbackService?.removeListener(playbackListenerStub)
-            } catch (e: Exception) { }
+            } catch (_: Exception) { }
             unbindService(connection)
             isBound = false
         }

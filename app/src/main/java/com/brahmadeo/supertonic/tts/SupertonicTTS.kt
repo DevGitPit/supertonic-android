@@ -9,7 +9,7 @@ object SupertonicTTS {
     private var currentModelPath: String? = null
 
     private val HINDI_SPLIT_PATTERN = Pattern.compile("([.!?\\u0964\\u0965]['\\u2019\\u201D\\u0022)}\\]]?)\\s+")
-    private val JAPANESE_SPLIT_PATTERN = Pattern.compile("([。！？][」』）』）｝\\]]?)\\s*")
+    private val JAPANESE_SPLIT_PATTERN = Pattern.compile("([。！？][」』）｝\\]]?)\\s*")
     private val DEFAULT_SPLIT_PATTERN = Pattern.compile("([.!?]['\\u2019\\u201D\\u0022)}\\]]?)\\s+")
 
     private val PARAGRAPH_REGEX = Regex("\\n\\s*\\n")
@@ -69,8 +69,6 @@ object SupertonicTTS {
         return success
     }
 
-    private var listeners = java.util.concurrent.CopyOnWriteArrayList<ProgressListener>()
-    
     // VULN-003 fix: Use an atomic SessionContext to ensure sid and listener are updated together
     private class SessionContext(val sid: Long, val listener: ProgressListener?)
     private val currentSession = AtomicReference<SessionContext?>(null)
@@ -80,43 +78,18 @@ object SupertonicTTS {
         fun onAudioChunk(sessionId: Long, data: ByteArray)
     }
 
-    fun addProgressListener(listener: ProgressListener) {
-        if (!listeners.contains(listener)) listeners.add(listener)
-    }
-
-    fun removeProgressListener(listener: ProgressListener) {
-        listeners.remove(listener)
-    }
-
     // Called from JNI
     fun notifyProgress(current: Int, total: Int) {
         val ctx = currentSession.get()
         val sid = ctx?.sid ?: 0L
-        val listener = ctx?.listener
-        
-        // Priority to task-specific listener
-        if (listener != null) {
-            listener.onProgress(sid, current, total)
-        } else {
-            // Only notify global listeners if no specific task listener is set
-            for (l in listeners) l.onProgress(sid, current, total)
-        }
+        ctx?.listener?.onProgress(sid, current, total)
     }
 
     // Called from JNI
     fun notifyAudioChunk(data: ByteArray) {
         val ctx = currentSession.get()
         val sid = ctx?.sid ?: 0L
-        val listener = ctx?.listener
-        
-        // STRICT ISOLATION: Audio chunks ONLY go to the requester
-        if (listener != null) {
-            listener.onAudioChunk(sid, data)
-        } else {
-            // Only if no specific task listener is active (e.g. legacy app call)
-            // we send to global listeners
-            for (l in listeners) l.onAudioChunk(sid, data)
-        }
+        ctx?.listener?.onAudioChunk(sid, data)
     }
 
     @Volatile
@@ -200,9 +173,9 @@ object SupertonicTTS {
     fun chunkText(text: String, lang: String): List<String> {
         val joined = try {
             nativeChunkText(text, lang)
-        } catch (e: UnsatisfiedLinkError) {
+        } catch (_: UnsatisfiedLinkError) {
             fallbackChunkText(text, lang)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             fallbackChunkText(text, lang)
         }
         return joined.split("\u001E").filter { chunk ->

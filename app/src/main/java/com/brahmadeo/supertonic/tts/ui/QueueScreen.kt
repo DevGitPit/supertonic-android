@@ -40,7 +40,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.brahmadeo.supertonic.tts.utils.QueueItem
@@ -53,7 +52,6 @@ fun QueueScreen(
     onBackClick: () -> Unit,
     onClearClick: () -> Unit
 ) {
-    val context = LocalContext.current
     // Observe QueueManager updates
     val queueItems by produceState(initialValue = QueueManager.getList()) {
         val listener: (List<QueueItem>) -> Unit = { items ->
@@ -203,7 +201,7 @@ fun QueueItemRow(
                         Spacer(modifier = Modifier.height(4.dp))
                         val voiceName = File(item.stylePath).nameWithoutExtension
                         Text(
-                            text = "$voiceName • ${String.format("%.2fx", item.speed)}",
+                            text = "$voiceName • ${String.format(java.util.Locale.US, "%.2fx", item.speed)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

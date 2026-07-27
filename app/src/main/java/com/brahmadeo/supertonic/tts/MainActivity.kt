@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.core.content.ContextCompat
+import androidx.core.content.IntentCompat
 import com.brahmadeo.supertonic.tts.service.IPlaybackListener
 import com.brahmadeo.supertonic.tts.service.IPlaybackService
 import com.brahmadeo.supertonic.tts.service.PlaybackService
@@ -821,7 +822,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun extractUrl(text: String): String? {
-        val pattern = Regex("https?://[^\\s]+")
+        val pattern = Regex("https?://\\S+")
         val match = pattern.find(text)
         return match?.value
     }
@@ -835,9 +836,9 @@ class MainActivity : ComponentActivity() {
         
         // 1. Check if the intent is a PDF or EPUB file import
         val isViewFile = action == Intent.ACTION_VIEW && intent.data != null
-        val isSendFile = action == Intent.ACTION_SEND && intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM) != null
+        val isSendFile = action == Intent.ACTION_SEND && IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java) != null
         
-        val fileUri = if (isViewFile) intent.data else if (isSendFile) intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM) else null
+        val fileUri = if (isViewFile) intent.data else if (isSendFile) IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java) else null
         
         if (fileUri != null) {
             val contentResolver = contentResolver
@@ -953,7 +954,7 @@ class MainActivity : ComponentActivity() {
                 }
                 return
             }
-        } catch (e: Exception) { }
+        } catch (_: Exception) { }
 
         viewModel.canResume.value = isPlayingPref
     }
