@@ -123,6 +123,37 @@ Always write tests for the normalization expansions and chunking rules to preven
 
 ---
 
+## Pronunciation Dictionary (Lexicon) Import/Export Format
+
+To easily share or modify pronunciation rules, you can import and export them as a JSON file.
+
+### JSON Schema
+The file must be a JSON array containing objects with the following fields:
+* **`term`** (or **`word`**): The source text or word pattern you wish to replace. (Required)
+* **`replacement`** (or **`pronunciation`** / **`ipa`**): The target text to substitute. (Required)
+  * *Note: `replacement` is a plain-text substitution applied before synthesis, not phonetic IPA notation.*
+* **`ignoreCase`** (optional, default: `true`): Boolean specifying whether matching is case-insensitive.
+* **`isRegex`** (optional, default: `false`): Boolean specifying whether to treat the matching term as a regular expression pattern.
+
+### Example JSON
+```json
+[
+  {
+    "term": "LLMs",
+    "replacement": "L L Ems",
+    "ignoreCase": true,
+    "isRegex": false
+  },
+  {
+    "word": "read",
+    "pronunciation": "red",
+    "ignoreCase": false
+  }
+]
+```
+
+---
+
 ### Credits
 * [Supertonic](https://github.com/supertone-inc/supertonic) - For creating lightweight, high-performance, and great-sounding TTS models optimized for edge compute.
 * [Readium Kotlin Toolkit](https://github.com/readium/kotlin-toolkit) (BSD 3-Clause) - For EPUB and PDF parsing, manifest structures, and book rendering navigation.

@@ -14,6 +14,11 @@ data class LexiconItem(
     var isRegex: Boolean = false
 )
 
+data class LexiconImportResult(
+    val items: List<LexiconItem>,
+    val skippedCount: Int
+)
+
 object LexiconManager {
     private const val FILE_NAME = "user_lexicon.json"
     private var cachedRules: List<LexiconItem> = emptyList()
@@ -107,5 +112,48 @@ object LexiconManager {
     fun reload(context: Context) {
         isLoaded = false
         load(context)
+    }
+
+    fun parseImportJson(jsonString: String): LexiconImportResult {
+        val items = mutableListOf<LexiconItem>()
+        var skippedCount = 0
+        try {
+            val jsonArray = JSONArray(jsonString)
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.optJSONObject(i)
+                if (obj == null) {
+                    skippedCount++
+                    continue
+                }
+
+                val term = when {
+                    obj.has("term") -> obj.optString("term")
+                    obj.has("word") -> obj.optString("word")
+                    else -> null
+                }
+
+                val replacement = when {
+                    obj.has("replacement") -> obj.optString("replacement")
+                    obj.has("pronunciation") -> obj.optString("pronunciation")
+                    obj.has("ipa") -> obj.optString("ipa")
+                    else -> null
+                }
+
+                if (!term.isNullOrBlank() && !replacement.isNullOrBlank()) {
+                    items.add(LexiconItem(
+                        id = obj.optString("id", java.util.UUID.randomUUID().toString()),
+                        term = term.trim(),
+                        replacement = replacement.trim(),
+                        ignoreCase = obj.optBoolean("ignoreCase", true),
+                        isRegex = obj.optBoolean("isRegex", false)
+                    ))
+                } else {
+                    skippedCount++
+                }
+            }
+        } catch (e: Exception) {
+            throw e
+        }
+        return LexiconImportResult(items, skippedCount)
     }
 }

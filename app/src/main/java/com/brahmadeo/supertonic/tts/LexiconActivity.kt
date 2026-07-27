@@ -161,7 +161,11 @@ class LexiconActivity : ComponentActivity() {
             }
 
             val fileName = "supertonic_lexicon.json"
-            val file = File(cacheDir, fileName)
+            val dir = File(cacheDir, "tts_output")
+            if (!dir.exists()) {
+                dir.mkdirs()
+            }
+            val file = File(dir, fileName)
             file.writeText(jsonArray.toString(2))
 
             val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
@@ -186,24 +190,17 @@ class LexiconActivity : ComponentActivity() {
             reader.close()
             inputStream.close()
 
-            val jsonArray = JSONArray(jsonString)
-            val importedItems = mutableListOf<LexiconItem>()
-
-            for (i in 0 until jsonArray.length()) {
-                val obj = jsonArray.getJSONObject(i)
-                if (obj.has("term") && obj.has("replacement")) {
-                    importedItems.add(LexiconItem(
-                        id = obj.optString("id", java.util.UUID.randomUUID().toString()),
-                        term = obj.getString("term"),
-                        replacement = obj.getString("replacement"),
-                        ignoreCase = obj.optBoolean("ignoreCase", true),
-                        isRegex = obj.optBoolean("isRegex", false)
-                    ))
-                }
-            }
+            val importResult = LexiconManager.parseImportJson(jsonString)
+            val importedItems = importResult.items
+            val skippedCount = importResult.skippedCount
 
             if (importedItems.isEmpty()) {
-                Toast.makeText(this, getString(R.string.no_valid_rules), Toast.LENGTH_SHORT).show()
+                val msg = if (skippedCount > 0) {
+                    getString(R.string.import_all_skipped_fmt, skippedCount)
+                } else {
+                    getString(R.string.no_valid_rules)
+                }
+                Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
                 return
             }
 
@@ -218,11 +215,12 @@ class LexiconActivity : ComponentActivity() {
                     addedCount++
                 } else {
                     val existing = currentRules[existingIndex]
-                    if (existing.replacement != imported.replacement || existing.ignoreCase != imported.ignoreCase) {
+                    if (existing.replacement != imported.replacement || existing.ignoreCase != imported.ignoreCase || existing.isRegex != imported.isRegex) {
                         // Replace the item with updated values
                         currentRules[existingIndex] = existing.copy(
                             replacement = imported.replacement,
-                            ignoreCase = imported.ignoreCase
+                            ignoreCase = imported.ignoreCase,
+                            isRegex = imported.isRegex
                         )
                         updatedCount++
                     }
@@ -234,13 +232,24 @@ class LexiconActivity : ComponentActivity() {
                 LexiconManager.reload(this)
                 refreshRules()
 
+                val message = if (skippedCount > 0) {
+                    getString(R.string.import_stats_with_skipped_fmt, addedCount, updatedCount, skippedCount)
+                } else {
+                    getString(R.string.import_stats_fmt, addedCount, updatedCount)
+                }
+
                 MaterialAlertDialogBuilder(this)
                     .setTitle(getString(R.string.import_complete_title))
-                    .setMessage(getString(R.string.import_stats_fmt, addedCount, updatedCount))
+                    .setMessage(message)
                     .setPositiveButton(getString(R.string.ok), null)
                     .show()
             } else {
-                Toast.makeText(this, getString(R.string.import_no_changes), Toast.LENGTH_SHORT).show()
+                val message = if (skippedCount > 0) {
+                    getString(R.string.import_no_changes_with_skipped_fmt, skippedCount)
+                } else {
+                    getString(R.string.import_no_changes)
+                }
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             e.printStackTrace()

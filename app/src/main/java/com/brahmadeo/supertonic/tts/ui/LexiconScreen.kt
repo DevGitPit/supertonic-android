@@ -29,6 +29,7 @@ fun LexiconScreen(
     onDeleteClick: (LexiconItem) -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -59,6 +60,13 @@ fun LexiconScreen(
                             onClick = {
                                 showMenu = false
                                 onExportClick()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Import Help") },
+                            onClick = {
+                                showMenu = false
+                                showHelpDialog = true
                             }
                         )
                     }
@@ -108,6 +116,61 @@ fun LexiconScreen(
                 }
             }
         }
+    }
+
+    if (showHelpDialog) {
+        AlertDialog(
+            onDismissRequest = { showHelpDialog = false },
+            title = { Text("Import Schema Help") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "The import JSON file must contain an array of objects. Supported fields:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "• term (or word): The word or pattern to replace.\n" +
+                               "• replacement (or pronunciation / ipa): The text substitution.\n" +
+                               "• ignoreCase (optional, default: true): Case sensitivity.\n" +
+                               "• isRegex (optional, default: false): Treat term as regex.\n\n" +
+                               "Note: replacement is literal text substituted before synthesis, not phonetic notation.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Normal
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Example format:",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "[\n" +
+                                   "  {\n" +
+                                   "    \"term\": \"LLMs\",\n" +
+                                   "    \"replacement\": \"L L Ems\",\n" +
+                                   "    \"ignoreCase\": true,\n" +
+                                   "    \"isRegex\": false\n" +
+                                   "  }\n" +
+                                   "]",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(8.dp),
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showHelpDialog = false }) {
+                    Text("OK")
+                }
+            }
+        )
     }
 }
 

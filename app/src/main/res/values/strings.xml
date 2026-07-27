@@ -91,9 +91,12 @@
     <string name="export_failed_fmt">Export failed: %1$s</string>
     <string name="import_error">Import error: Invalid JSON file</string>
     <string name="no_valid_rules">No valid rules found in file</string>
+    <string name="import_all_skipped_fmt">No valid rules found. %1$d entries skipped (missing required fields).</string>
     <string name="import_complete_title">Import Complete</string>
     <string name="import_stats_fmt">%1$d new terms added.\n%2$d terms updated.</string>
+    <string name="import_stats_with_skipped_fmt">%1$d new terms added.\n%2$d terms updated.\n%3$d entries skipped (missing required fields).</string>
     <string name="import_no_changes">All terms already exist and are up to date.</string>
+    <string name="import_no_changes_with_skipped_fmt">All matching terms are already up to date. %1$d entries skipped (missing required fields).</string>
     <string name="export_chooser_title">Export Lexicon</string>
 
     <!-- Menus -->
