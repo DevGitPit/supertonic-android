@@ -49,8 +49,7 @@ fun PlaybackScreen(
     onSleepTimerClick: () -> Unit
 ) {
     val listState = rememberLazyListState()
-    val navBarsPadding = WindowInsets.navigationBars.asPaddingValues()
-    val navBarBottom = navBarsPadding.calculateBottomPadding()
+    val density = androidx.compose.ui.platform.LocalDensity.current
 
     val bottomPadding by animateDpAsState(
         targetValue = if (isServiceActive || isPlaying) 210.dp else 140.dp,
@@ -58,11 +57,20 @@ fun PlaybackScreen(
     )
 
     // Auto-scroll to active sentence
-    LaunchedEffect(currentIndex) {
+    LaunchedEffect(currentIndex, isServiceActive, isPlaying, bottomPadding) {
         if (currentIndex in sentences.indices) {
-            val visibleInfo = listState.layoutInfo.visibleItemsInfo
-            val isVisible = visibleInfo.any { it.index == currentIndex }
-            if (!isVisible) {
+            val layoutInfo = listState.layoutInfo
+            val visibleInfo = layoutInfo.visibleItemsInfo
+            val activeItem = visibleInfo.find { it.index == currentIndex }
+
+            val bottomPaddingPx = with(density) { bottomPadding.toPx() }
+            val unobscuredEnd = layoutInfo.viewportEndOffset - bottomPaddingPx
+
+            val isObscured = activeItem == null ||
+                    activeItem.offset < layoutInfo.viewportStartOffset ||
+                    (activeItem.offset + activeItem.size) > unobscuredEnd
+
+            if (isObscured) {
                 listState.animateScrollToItem(currentIndex)
             }
         }
@@ -103,7 +111,7 @@ fun PlaybackScreen(
                     top = 16.dp,
                     start = 16.dp,
                     end = 16.dp,
-                    bottom = bottomPadding + navBarBottom
+                    bottom = bottomPadding
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize()
@@ -121,12 +129,7 @@ fun PlaybackScreen(
             ElevatedCard(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(
-                        start = 16.dp,
-                        top = 16.dp,
-                        end = 16.dp,
-                        bottom = 16.dp + navBarBottom
-                    )
+                    .padding(16.dp)
                     .fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
                 elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
