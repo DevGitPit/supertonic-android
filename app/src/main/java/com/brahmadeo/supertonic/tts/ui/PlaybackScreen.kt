@@ -102,6 +102,7 @@ fun PlaybackScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
+                    .navigationBarsPadding()
                     .fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
                 elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
