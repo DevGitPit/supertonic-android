@@ -9,7 +9,7 @@ object SupertonicTTS {
     private var currentModelPath: String? = null
 
     private val HINDI_SPLIT_PATTERN = Pattern.compile("([.!?\\u0964\\u0965]['\\u2019\\u201D\\u0022)}\\]]?)\\s+")
-    private val JAPANESE_SPLIT_PATTERN = Pattern.compile("([。！？][」』）』）｝\\]]?)\\s*")
+    private val JAPANESE_SPLIT_PATTERN = Pattern.compile("([。！？][」』）｝\\]]?)\\s*")
     private val DEFAULT_SPLIT_PATTERN = Pattern.compile("([.!?]['\\u2019\\u201D\\u0022)}\\]]?)\\s+")
 
     private val PARAGRAPH_REGEX = Regex("\\n\\s*\\n")
@@ -78,14 +78,6 @@ object SupertonicTTS {
     interface ProgressListener {
         fun onProgress(sessionId: Long, current: Int, total: Int)
         fun onAudioChunk(sessionId: Long, data: ByteArray)
-    }
-
-    fun addProgressListener(listener: ProgressListener) {
-        if (!listeners.contains(listener)) listeners.add(listener)
-    }
-
-    fun removeProgressListener(listener: ProgressListener) {
-        listeners.remove(listener)
     }
 
     // Called from JNI
@@ -200,9 +192,9 @@ object SupertonicTTS {
     fun chunkText(text: String, lang: String): List<String> {
         val joined = try {
             nativeChunkText(text, lang)
-        } catch (e: UnsatisfiedLinkError) {
+        } catch (_: UnsatisfiedLinkError) {
             fallbackChunkText(text, lang)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             fallbackChunkText(text, lang)
         }
         return joined.split("\u001E").filter { chunk ->

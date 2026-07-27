@@ -44,6 +44,10 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
 import org.readium.r2.shared.publication.services.positions
+import kotlin.time.Duration.Companion.milliseconds
+import androidx.core.graphics.scale
+import androidx.core.graphics.createBitmap
+import androidx.core.content.edit
 
 class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.OnAudioFocusChangeListener {
 
@@ -298,7 +302,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                         if (SupertonicTTS.isCancelled() || !isActive) break
                         
                         while (!isPlaying && isSynthesizing && isActive) {
-                            delay(100)
+                            delay(100.milliseconds)
                         }
                         if (SupertonicTTS.isCancelled() || !isActive || !isSynthesizing) break
 
@@ -448,7 +452,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                 if (safeTrack.state == AudioTrack.STATE_INITIALIZED && safeTrack.playState == AudioTrack.PLAYSTATE_PLAYING) {
                     try { safeTrack.pause() } catch (_: Exception) {}
                 }
-                delay(100)
+                delay(100.milliseconds)
                 continue
             } else {
                 if (safeTrack.state == AudioTrack.STATE_INITIALIZED && safeTrack.playState != AudioTrack.PLAYSTATE_PLAYING) {
@@ -489,7 +493,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
             val currentHead = try { safeTrack.playbackHeadPosition } catch (_: Exception) { startHead + samplesToWait }
             val headMove = currentHead - startHead
             if (headMove >= samplesToWait) break
-            delay(50)
+            delay(50.milliseconds)
         }
     }
 
@@ -557,9 +561,9 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
             currentSentenceIndex = -1
             if (wakeLock?.isHeld == true) wakeLock?.release()
             setSleepTimer(0)
-            getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).edit()
-                .putBoolean("is_playing", false)
-                .apply()
+            getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).edit {
+                putBoolean("is_playing", false)
+            }
                 
             notifyListenerPlaybackStopped()
             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
@@ -845,7 +849,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
     private fun startSleepTimerCountdown() {
         sleepTimerJob = serviceScope.launch {
             while (sleepTimerSecondsRemaining > 0) {
-                delay(1000L)
+                delay(1000L.milliseconds)
                 if (isPlaying) {
                     sleepTimerSecondsRemaining -= 1
                     notifyListenerSleepTimer(sleepTimerSecondsRemaining)
@@ -902,7 +906,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
             val currentChapterHref = prefs.getString("last_chapter_href", null)
             val currentPageIndex = prefs.getInt("last_page_index", -1)
 
-            val conformsToPdf = publication.metadata.conformsTo.contains(org.readium.r2.shared.publication.Publication.Profile.PDF) == true
+            val conformsToPdf = publication.metadata.conformsTo.contains(org.readium.r2.shared.publication.Publication.Profile.PDF)
             val isPdfMediaType = publication.readingOrder.firstOrNull()?.mediaType?.matches(org.readium.r2.shared.util.mediatype.MediaType.PDF) == true
             val isPdf = conformsToPdf || isPdfMediaType
 
@@ -914,12 +918,12 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                     extractResult.onSuccess { nextText ->
                         val preparedText = prepareTextForTts(nextText, currentLang)
                         
-                        prefs.edit()
-                            .putString("last_text", preparedText)
-                            .putInt("last_page_index", nextPageIndex)
-                            .remove("last_chapter_href")
-                            .putInt("last_index", 0)
-                            .apply()
+                        prefs.edit {
+                            putString("last_text", preparedText)
+                                .putInt("last_page_index", nextPageIndex)
+                                .remove("last_chapter_href")
+                                .putInt("last_index", 0)
+                        }
                         
                         com.brahmadeo.supertonic.tts.utils.EbookManager.setLastReadChapter(this@PlaybackService, bookPath, "page_$nextPageIndex")
                         
@@ -958,8 +962,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                 }
                 
                 val flatLinks = links.flatten()
-                val currentHref = currentChapterHref
-                val currentIndex = flatLinks.indexOfFirst { it.href.toString() == currentHref }
+                val currentIndex = flatLinks.indexOfFirst { it.href.toString() == currentChapterHref }
 
                 if (currentIndex != -1 && currentIndex + 1 < flatLinks.size) {
                     val nextLink = flatLinks[currentIndex + 1]
@@ -969,12 +972,12 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                     extractResult.onSuccess { nextText ->
                         val preparedText = prepareTextForTts(nextText, currentLang)
                         
-                        prefs.edit()
-                            .putString("last_text", preparedText)
-                            .putString("last_chapter_href", nextHref)
-                            .remove("last_page_index")
-                            .putInt("last_index", 0)
-                            .apply()
+                        prefs.edit {
+                            putString("last_text", preparedText)
+                                .putString("last_chapter_href", nextHref)
+                                .remove("last_page_index")
+                                .putInt("last_index", 0)
+                        }
                         
                         com.brahmadeo.supertonic.tts.utils.EbookManager.setLastReadChapter(this@PlaybackService, bookPath, nextHref)
                         
@@ -1035,7 +1038,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
             
             val rawCover = extractEpubCover(bookPath)
             if (rawCover != null) {
-                val bitmap = scaleAndPadToSquare(rawCover, targetSize = 1024)
+                val bitmap = scaleAndPadToSquare(rawCover)
                 if (bitmap != rawCover) {
                     rawCover.recycle()
                 }
@@ -1190,7 +1193,8 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         return result.joinToString("/")
     }
 
-    private fun scaleAndPadToSquare(bitmap: Bitmap, targetSize: Int = 768): Bitmap {
+    private fun scaleAndPadToSquare(bitmap: Bitmap): Bitmap {
+        val targetSize = 1024
         val width = bitmap.width
         val height = bitmap.height
         
@@ -1199,8 +1203,8 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         val newWidth = (width * scale).toInt()
         val newHeight = (height * scale).toInt()
         
-        val scaledBitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
-        val outputBitmap = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
+        val scaledBitmap = bitmap.scale(newWidth, newHeight)
+        val outputBitmap = createBitmap(targetSize, targetSize)
         val canvas = android.graphics.Canvas(outputBitmap)
         
         val left = (targetSize - newWidth) / 2f
@@ -1217,7 +1221,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
 
     private fun createFallbackCover(isPdf: Boolean): Bitmap {
         val size = 768
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(size, size)
         val canvas = android.graphics.Canvas(bitmap)
         
         // Detect Day/Night mode

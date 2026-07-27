@@ -3,9 +3,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.compose'
-    id 'org.mozilla.rust-android-gradle.rust-android'
+    id 'net.mullvad.rust-android'
 }
 
 // --- HELPER FUNCTIONS ---
@@ -84,7 +83,7 @@ cargo {
 // --- NATIVE LIBRARY TASKS ---
 
 tasks.register('extractOnnxLib', Copy) {
-    from { zipTree(configurations.onnxRuntime.singleFile) }
+    from(configurations.onnxRuntime.elements.map { zipTree(it.first().asFile) })
     into layout.buildDirectory.dir("onnxruntime")
     include "jni/**/libonnxruntime.so"
 }
@@ -123,16 +122,16 @@ ext.abiCodes = ['armeabi-v7a': 1, 'arm64-v8a': 2, 'x86': 3, 'x86_64': 4]
 // --- ANDROID CONFIGURATION ---
 
 android {
-    namespace 'com.brahmadeo.supertonic.tts'
-    compileSdk 37
+    namespace = 'com.brahmadeo.supertonic.tts'
+    compileSdk = 37
     ndkVersion = "29.0.14206865"
 
     defaultConfig {
-        applicationId "com.brahmadeo.supertonic.tts"
-        minSdk 24
-        targetSdk 37
-        versionCode 22
-        versionName "3.2.5"
+        applicationId = "com.brahmadeo.supertonic.tts"
+        minSdk = 24
+        targetSdk = 37
+        versionCode = 23
+        versionName = "3.2.6"
 
         if (!isSplitApksEnabled()) {
             ndk {
@@ -145,35 +144,25 @@ android {
 
     splits {
         abi {
-            enable isSplitApksEnabled()
+            enable = isSplitApksEnabled()
             reset()
             include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
-            universalApk false
-        }
-    }
-
-    applicationVariants.all { variant ->
-        variant.outputs.each { output ->
-            def abi = output.getFilter(com.android.build.OutputFile.ABI)
-            def baseAbiCode = project.ext.abiCodes.get(abi)
-            if (baseAbiCode != null) {
-                output.versionCodeOverride = variant.versionCode * 1000000 + baseAbiCode
-            }
+            universalApk = false
         }
     }
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled = true
+            shrinkResources = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
     compileOptions {
-        coreLibraryDesugaringEnabled true
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildFeatures {
@@ -194,6 +183,21 @@ android {
     }
 }
 
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.forEach { output ->
+            def abiFilter = output.filters.find { it.filterType.name() == 'ABI' }
+            if (abiFilter != null) {
+                def abi = abiFilter.identifier
+                def baseAbiCode = project.ext.abiCodes.get(abi)
+                if (baseAbiCode != null) {
+                    output.versionCode.set(variant.versionCode.map { it * 1000000 + baseAbiCode })
+                }
+            }
+        }
+    }
+}
+
 afterEvaluate {
     android.sourceSets.main.jniLibs.setSrcDirs(["src/main/jniLibs", layout.buildDirectory.dir("finalJniLibs").get().asFile.absolutePath])
 }
@@ -211,9 +215,9 @@ kotlin {
 
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
-    implementation 'androidx.core:core-ktx:1.18.0'
+    implementation 'androidx.core:core-ktx:1.19.0'
     implementation 'androidx.appcompat:appcompat:1.7.1'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.10.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.11.0'
     implementation 'com.google.android.material:material:1.14.0'
 
     // UI structure and Audio Session handling

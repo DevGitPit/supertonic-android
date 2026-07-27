@@ -9,6 +9,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
+import kotlin.time.Duration.Companion.milliseconds
 
 object AssetManager {
     fun getModelVersionForLanguage(lang: String): String {
@@ -121,7 +122,7 @@ object AssetManager {
                     if (responseCode == 429) {
                         val retryAfter = conn.getHeaderField("Retry-After")?.toLongOrNull() ?: 60L
                         Log.w(TAG, "Rate limited probing $urlString, waiting ${retryAfter}s")
-                        delay(retryAfter * 1_000)
+                        delay((retryAfter * 1_000).milliseconds)
                         lastException = Exception("HTTP 429 for $urlString")
                         return@repeat
                     }
@@ -142,7 +143,7 @@ object AssetManager {
             } catch (e: Exception) {
                 lastException = e
                 Log.w(TAG, "Probe attempt ${attempt + 1}/$MAX_RETRIES failed for $urlString: ${e.message}")
-                if (attempt < MAX_RETRIES - 1) delay(1_000L * (attempt + 1))
+                if (attempt < MAX_RETRIES - 1) delay((1_000L * (attempt + 1)).milliseconds)
             }
         }
         throw lastException ?: Exception("Probe failed after $MAX_RETRIES attempts")
@@ -170,7 +171,7 @@ object AssetManager {
                     if (responseCode == 429) {
                         val retryAfter = conn.getHeaderField("Retry-After")?.toLongOrNull() ?: 60L
                         Log.w(TAG, "Rate limited downloading $url, waiting ${retryAfter}s")
-                        delay(retryAfter * 1_000)
+                        delay((retryAfter * 1_000).milliseconds)
                         throw Exception("HTTP 429 for $url")
                     }
                     if (responseCode == 416) {
@@ -203,7 +204,7 @@ object AssetManager {
             } catch (e: Exception) {
                 lastException = e
                 Log.w(TAG, "Attempt ${attempt + 1}/$MAX_RETRIES failed for $url: ${e.message}")
-                if (attempt < MAX_RETRIES - 1) delay(1_000L * (attempt + 1))
+                if (attempt < MAX_RETRIES - 1) delay((1_000L * (attempt + 1)).milliseconds)
             }
         }
         throw lastException ?: Exception("Download failed after $MAX_RETRIES attempts")

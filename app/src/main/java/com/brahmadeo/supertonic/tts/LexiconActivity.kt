@@ -1,7 +1,6 @@
 package com.brahmadeo.supertonic.tts
 
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.net.Uri
@@ -10,19 +9,22 @@ import android.os.IBinder
 import android.os.RemoteException
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.core.content.FileProvider
 import com.brahmadeo.supertonic.tts.service.IPlaybackService
 import com.brahmadeo.supertonic.tts.service.PlaybackService
 import com.brahmadeo.supertonic.tts.ui.LexiconEditDialog
 import com.brahmadeo.supertonic.tts.ui.LexiconScreen
 import com.brahmadeo.supertonic.tts.ui.theme.SupertonicTheme
+import com.brahmadeo.supertonic.tts.utils.AssetManager
 import com.brahmadeo.supertonic.tts.utils.LexiconItem
 import com.brahmadeo.supertonic.tts.utils.LexiconManager
-import com.brahmadeo.supertonic.tts.utils.AssetManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.json.JSONArray
 import org.json.JSONObject
@@ -278,7 +280,6 @@ class LexiconActivity : ComponentActivity() {
         
         // Ensure we point to the correct versioned directory
         val stylePath = File(filesDir, "$version/voice_styles/$voiceFile").absolutePath
-        val steps = prefs.getInt("diffusion_steps", 5)
 
         // Use higher steps (10) for test to ensure short words are audible and clear
         val testSteps = 10

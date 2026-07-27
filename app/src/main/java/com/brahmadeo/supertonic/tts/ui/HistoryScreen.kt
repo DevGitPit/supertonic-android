@@ -72,10 +72,10 @@ fun HistoryScreen(
             calendar.timeInMillis = item.timestamp
             val itemDay = calendar.get(Calendar.DAY_OF_YEAR)
             val itemYear = calendar.get(Calendar.YEAR)
-            
-            when {
-                itemYear == year && itemDay == today -> "Today"
-                itemYear == year && itemDay == today - 1 -> "Yesterday"
+
+            when (itemYear) {
+                year if itemDay == today -> "Today"
+                year if itemDay == today - 1 -> "Yesterday"
                 else -> {
                     SimpleDateFormat("MMMM dd", Locale.getDefault()).format(Date(item.timestamp))
                 }

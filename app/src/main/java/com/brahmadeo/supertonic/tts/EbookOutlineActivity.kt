@@ -92,6 +92,7 @@ import org.readium.r2.shared.publication.services.positions
 import org.readium.r2.shared.util.mediatype.MediaType
 import java.io.File
 import kotlin.math.max
+import androidx.core.content.edit
 
 class EbookOutlineActivity : ComponentActivity() {
 
@@ -261,7 +262,7 @@ class EbookOutlineActivity : ComponentActivity() {
                                     checked = directPlayback,
                                     onCheckedChange = {
                                         directPlayback = it
-                                        prefs.edit().putBoolean("pref_direct_playback", it).apply()
+                                        prefs.edit { putBoolean("pref_direct_playback", it) }
                                     }
                                 )
                             }
@@ -279,7 +280,7 @@ class EbookOutlineActivity : ComponentActivity() {
                                     checked = autoPlayNext,
                                     onCheckedChange = {
                                         autoPlayNext = it
-                                        prefs.edit().putBoolean("pref_auto_play_next", it).apply()
+                                        prefs.edit { putBoolean("pref_auto_play_next", it) }
                                     }
                                 )
                             }
