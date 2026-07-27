@@ -69,8 +69,6 @@ object SupertonicTTS {
         return success
     }
 
-    private var listeners = java.util.concurrent.CopyOnWriteArrayList<ProgressListener>()
-    
     // VULN-003 fix: Use an atomic SessionContext to ensure sid and listener are updated together
     private class SessionContext(val sid: Long, val listener: ProgressListener?)
     private val currentSession = AtomicReference<SessionContext?>(null)
@@ -84,31 +82,14 @@ object SupertonicTTS {
     fun notifyProgress(current: Int, total: Int) {
         val ctx = currentSession.get()
         val sid = ctx?.sid ?: 0L
-        val listener = ctx?.listener
-        
-        // Priority to task-specific listener
-        if (listener != null) {
-            listener.onProgress(sid, current, total)
-        } else {
-            // Only notify global listeners if no specific task listener is set
-            for (l in listeners) l.onProgress(sid, current, total)
-        }
+        ctx?.listener?.onProgress(sid, current, total)
     }
 
     // Called from JNI
     fun notifyAudioChunk(data: ByteArray) {
         val ctx = currentSession.get()
         val sid = ctx?.sid ?: 0L
-        val listener = ctx?.listener
-        
-        // STRICT ISOLATION: Audio chunks ONLY go to the requester
-        if (listener != null) {
-            listener.onAudioChunk(sid, data)
-        } else {
-            // Only if no specific task listener is active (e.g. legacy app call)
-            // we send to global listeners
-            for (l in listeners) l.onAudioChunk(sid, data)
-        }
+        ctx?.listener?.onAudioChunk(sid, data)
     }
 
     @Volatile
