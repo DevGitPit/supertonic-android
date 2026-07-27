@@ -1,6 +1,7 @@
 package com.brahmadeo.supertonic.tts.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -48,10 +49,22 @@ fun PlaybackScreen(
     onSleepTimerClick: () -> Unit
 ) {
     val listState = rememberLazyListState()
+    val navBarsPadding = WindowInsets.navigationBars.asPaddingValues()
+    val navBarBottom = navBarsPadding.calculateBottomPadding()
 
+    val bottomPadding by animateDpAsState(
+        targetValue = if (isServiceActive || isPlaying) 210.dp else 140.dp,
+        label = "playback_bottom_padding"
+    )
+
+    // Auto-scroll to active sentence
     LaunchedEffect(currentIndex) {
         if (currentIndex in sentences.indices) {
-            listState.animateScrollToItem(currentIndex)
+            val visibleInfo = listState.layoutInfo.visibleItemsInfo
+            val isVisible = visibleInfo.any { it.index == currentIndex }
+            if (!isVisible) {
+                listState.animateScrollToItem(currentIndex)
+            }
         }
     }
 
@@ -60,8 +73,16 @@ fun PlaybackScreen(
             TopAppBar(
                 title = { Text("Now Playing", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close"
+                        )
+                    }
+                },
+                actions = {
                     IconButton(onClick = onHomeClick) {
-                        Icon(Icons.Default.Home, contentDescription = "Home")
+                        Icon(imageVector = Icons.Default.Home, contentDescription = "Home")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -82,7 +103,7 @@ fun PlaybackScreen(
                     top = 16.dp,
                     start = 16.dp,
                     end = 16.dp,
-                    bottom = 140.dp
+                    bottom = bottomPadding + navBarBottom
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize()
@@ -100,8 +121,12 @@ fun PlaybackScreen(
             ElevatedCard(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(16.dp)
-                    .navigationBarsPadding()
+                    .padding(
+                        start = 16.dp,
+                        top = 16.dp,
+                        end = 16.dp,
+                        bottom = 16.dp + navBarBottom
+                    )
                     .fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
                 elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),

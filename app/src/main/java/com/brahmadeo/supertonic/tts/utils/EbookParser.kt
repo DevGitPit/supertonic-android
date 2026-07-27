@@ -468,10 +468,10 @@ class EbookParser(context: Context) {
         
         // 3. Join single newlines into paragraphs (preserving spaces)
         // Join if line doesn't end in sentence punctuation and next char is a letter
-        cleaned = cleaned.replace(Regex("([^.!?\\-])\\s*\\r?\\n\\s*(\\p{L})"), "$1 $2")
+        cleaned = cleaned.replace(Regex("([^.!?\\-])\\h*\\r?\\n\\h*(\\p{L})"), "$1 $2")
 
         // 4. Remove lone page numbers on their own lines
-        cleaned = cleaned.replace(Regex("(?m)^\\s*\\d+\\s*$"), "")
+        cleaned = cleaned.replace(Regex("(?m)^\\h*\\d+\\h*$"), "")
 
         // 5. Fix multiple spaces and excessive newlines
         return cleaned.replace(Regex(" {2,}"), " ")

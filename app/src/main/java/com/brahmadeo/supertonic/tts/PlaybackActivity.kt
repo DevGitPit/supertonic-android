@@ -471,11 +471,7 @@ class PlaybackActivity : ComponentActivity() {
     private fun restoreState() {
         try {
             if (playbackService?.isServiceActive == false) {
-                 playbackListenerStub.onStateChanged(
-                     isPlaying = false,
-                     hasContent = true,
-                     isSynthesizing = false
-                 )
+                  playbackListenerStub.onStateChanged(false, true, false)
             }
         } catch (_: RemoteException) { }
     }
