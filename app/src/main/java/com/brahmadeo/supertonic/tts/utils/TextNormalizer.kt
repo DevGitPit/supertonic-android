@@ -188,6 +188,7 @@ class TextNormalizer {
                 "Mr" -> "Mister "
                 "Mrs" -> "Missus "
                 "Ms" -> "Miss "
+                null -> m.group(0) ?: ""
                 else -> m.group(0) ?: ""
             }
         }
