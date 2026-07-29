@@ -130,8 +130,8 @@ android {
         applicationId = "com.brahmadeo.supertonic.tts"
         minSdk = 24
         targetSdk = 37
-        versionCode = 23
-        versionName = "3.2.6"
+        versionCode = 24
+        versionName = "3.2.7"
 
         if (!isSplitApksEnabled()) {
             ndk {
@@ -191,7 +191,7 @@ androidComponents {
                 def abi = abiFilter.identifier
                 def baseAbiCode = project.ext.abiCodes.get(abi)
                 if (baseAbiCode != null) {
-                    output.versionCode.set(variant.versionCode.map { it * 1000000 + baseAbiCode })
+                    output.versionCode.set(android.defaultConfig.versionCode * 1000000 + baseAbiCode)
                 }
             }
         }
