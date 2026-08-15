@@ -185,4 +185,18 @@
     <string name="import_voice_style_button">Import Custom Voice Style (.json)</string>
     <string name="import_voice_style_invalid">Invalid voice style JSON file</string>
     <string name="import_voice_style_success">Imported custom voice style: %1$s</string>
+    <string name="delete_voice_title">Delete Custom Voice?</string>
+    <string name="delete_voice_message">Are you sure you want to delete the custom voice \"%1$s\"? This cannot be undone.</string>
+    <string name="delete_voice_success">Deleted custom voice: %1$s</string>
+
+    <!-- Model Override & Custom Voices Manager -->
+    <string name="action_custom_voices">Custom Voices</string>
+    <string name="model_engine_label">Model Engine</string>
+    <string name="model_engine_default">Default (Language Optimized)</string>
+    <string name="model_engine_v1">Model v1 (Light / English)</string>
+    <string name="model_engine_v2">Model v2 (Medium / Multilingual)</string>
+    <string name="model_engine_v3">Model v3 (Heavy / Multilingual)</string>
+    <string name="custom_voices_title">Custom Voices</string>
+    <string name="custom_voices_desc">Manage your imported voice styles (.json files)</string>
+    <string name="close_button">Close</string>
 </resources>
