@@ -199,4 +199,10 @@
     <string name="custom_voices_title">Custom Voices</string>
     <string name="custom_voices_desc">Manage your imported voice styles (.json files)</string>
     <string name="close_button">Close</string>
+
+    <!-- Model v1 Deletion -->
+    <string name="action_delete_v1">Delete Model v1</string>
+    <string name="v1_delete_title">Delete Model v1?</string>
+    <string name="v1_delete_message">Are you sure you want to delete the Model v1 assets? This will free up ~255MB of storage. You can download them again later if needed.</string>
+    <string name="v1_deleted_msg">Model v1 deleted successfully</string>
 </resources>
