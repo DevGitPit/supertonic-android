@@ -21,6 +21,7 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.remember
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.core.content.ContextCompat
@@ -55,7 +56,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,8 +69,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 
 class MainActivity : ComponentActivity() {
 
@@ -339,6 +345,27 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    if (viewModel.showV1DeleteDialog.value) {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { viewModel.showV1DeleteDialog.value = false },
+                            title = { Text(getString(R.string.v1_delete_title)) },
+                            text = { Text(getString(R.string.v1_delete_message)) },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        AssetManager.deleteVersion(this@MainActivity, "v1")
+                                        viewModel.showV1DeleteDialog.value = false
+                                        Toast.makeText(this@MainActivity, getString(R.string.v1_deleted_msg), Toast.LENGTH_SHORT).show()
+                                    },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                ) { Text(getString(R.string.delete)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { viewModel.showV1DeleteDialog.value = false }) { Text(getString(R.string.cancel)) }
+                            }
+                        )
+                    }
+
                     if (viewModel.showV2DeleteDialog.value) {
                         androidx.compose.material3.AlertDialog(
                             onDismissRequest = { viewModel.showV2DeleteDialog.value = false },
@@ -465,38 +492,25 @@ class MainActivity : ComponentActivity() {
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
 
-                                    val uriHandler = LocalUriHandler.current
+                                    val linkStyle = SpanStyle(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        textDecoration = TextDecoration.Underline
+                                    )
                                     val annotatedString = buildAnnotatedString {
                                         append("Tip: Voice styles are .json files containing speaker characteristics. You can extract them from your own voice recordings using the external python project: ")
-                                        pushStringAnnotation(tag = "URL", annotation = "https://github.com/saurabhv749/supertonic3-voice-clone")
-                                        withStyle(style = androidx.compose.ui.text.SpanStyle(
-                                            color = MaterialTheme.colorScheme.primary,
-                                            textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
-                                        )) {
+                                        withLink(LinkAnnotation.Url("https://github.com/saurabhv749/supertonic3-voice-clone", styles = TextLinkStyles(style = linkStyle))) {
                                             append("supertonic3-voice-clone")
                                         }
-                                        pop()
                                         append(" on a computer.")
                                     }
 
-                                    ClickableText(
+                                    Text(
                                         text = annotatedString,
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        ),
-                                        onClick = { offset ->
-                                            annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
-                                                .firstOrNull()?.let { annotation ->
-                                                    try {
-                                                        uriHandler.openUri(annotation.item)
-                                                    } catch (e: Exception) {
-                                                        e.printStackTrace()
-                                                    }
-                                                }
-                                        }
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     
-                                    androidx.compose.material3.Button(
+                                    Button(
                                         onClick = {
                                             voiceStylePickerLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*"))
                                         },
@@ -513,13 +527,13 @@ class MainActivity : ComponentActivity() {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     
                                     if (customVoices.isEmpty()) {
-                                        androidx.compose.material3.Text(
+                                        Text(
                                             text = "No custom voices imported yet.",
                                             style = MaterialTheme.typography.bodyMedium,
                                             modifier = Modifier.padding(vertical = 16.dp)
                                         )
                                     } else {
-                                        val scrollState = androidx.compose.foundation.rememberScrollState()
+                                        val scrollState = rememberScrollState()
                                         Column(
                                             modifier = Modifier
                                                 .heightIn(max = 240.dp)
@@ -712,6 +726,7 @@ class MainActivity : ComponentActivity() {
                         onHistoryClick = { historyLauncher.launch(Intent(this, HistoryActivity::class.java)) },
                         onQueueClick = { startActivity(Intent(this, QueueActivity::class.java)) },
                         onLexiconClick = { startActivity(Intent(this, LexiconActivity::class.java)) },
+                        onDeleteV1Click = { viewModel.showV1DeleteDialog.value = true },
                         onDeleteV2Click = { viewModel.showV2DeleteDialog.value = true },
                         onDeleteV3Click = { viewModel.showV3DeleteDialog.value = true },
                         onOpenEbookClick = { 
@@ -727,6 +742,7 @@ class MainActivity : ComponentActivity() {
                                 ebookLauncher.launch(arrayOf("application/epub+zip", "application/pdf"))
                             }
                         },
+                        canDeleteV1 = AssetManager.isV1Ready(this) && (AssetManager.isV2Ready(this) || AssetManager.isV3Ready(this)) && currentModelVersion != "v1",
                         isV2Ready = AssetManager.isV2Ready(this),
                         isV3Ready = AssetManager.isV3Ready(this),
 

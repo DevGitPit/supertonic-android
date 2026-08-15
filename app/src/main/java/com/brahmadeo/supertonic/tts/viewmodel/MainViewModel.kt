@@ -47,6 +47,7 @@ class MainViewModel : ViewModel() {
     var showQueueDialog = mutableStateOf(false)
     var queueDialogText = ""
     var showV2ConfirmDialog = mutableStateOf(false)
+    var showV1DeleteDialog = mutableStateOf(false)
     var showV2DeleteDialog = mutableStateOf(false)
     var showV3ConfirmDialog = mutableStateOf(false)
     var showV3DeleteDialog = mutableStateOf(false)

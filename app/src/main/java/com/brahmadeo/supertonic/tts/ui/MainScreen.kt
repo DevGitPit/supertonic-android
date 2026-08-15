@@ -85,9 +85,11 @@ fun MainScreen(
     onHistoryClick: () -> Unit,
     onQueueClick: () -> Unit,
     onLexiconClick: () -> Unit,
+    onDeleteV1Click: () -> Unit,
     onDeleteV2Click: () -> Unit,
     onDeleteV3Click: () -> Unit,
     onOpenEbookClick: () -> Unit,
+    canDeleteV1: Boolean,
     isV2Ready: Boolean,
     isV3Ready: Boolean,
 
@@ -180,6 +182,12 @@ fun MainScreen(
                             DropdownMenuItem(
                                 text = { Text(stringResource(AppR.string.action_delete_v3), color = MaterialTheme.colorScheme.error) },
                                 onClick = { showMenu = false; onDeleteV3Click() }
+                            )
+                        }
+                        if (canDeleteV1) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(AppR.string.action_delete_v1), color = MaterialTheme.colorScheme.error) },
+                                onClick = { showMenu = false; onDeleteV1Click() }
                             )
                         }
                     }
@@ -667,9 +675,11 @@ fun MainScreenPreview() {
             onHistoryClick = {},
             onQueueClick = {},
             onLexiconClick = {},
+            onDeleteV1Click = {},
             onDeleteV2Click = {},
             onDeleteV3Click = {},
             onOpenEbookClick = {},
+            canDeleteV1 = true,
             isV2Ready = true,
             isV3Ready = true,
             canResume = true,
