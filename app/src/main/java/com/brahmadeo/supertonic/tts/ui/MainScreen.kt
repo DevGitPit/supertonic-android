@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.MoreVert
@@ -57,7 +58,9 @@ fun MainScreen(
     selectedVoiceFile: String,
     onVoiceChange: (String) -> Unit,
 
-    onImportVoiceStyleClick: () -> Unit,
+    preferredModelEngine: String,
+    onPreferredModelEngineChange: (String) -> Unit,
+    onCustomVoicesClick: () -> Unit,
 
     isMixingEnabled: Boolean,
     onMixingEnabledChange: (Boolean) -> Unit,
@@ -98,6 +101,26 @@ fun MainScreen(
     onMiniPlayerPlayPauseClick: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
+
+    val defaultVoiceFiles = remember {
+        listOf(
+            "M1.json", "M2.json", "M3.json", "M4.json", "M5.json",
+            "F1.json", "F2.json", "F3.json", "F4.json", "F5.json"
+        )
+    }
+    val sortedVoiceNames = remember(voices) {
+        voices.keys.toList().sortedWith { name1, name2 ->
+            val file1 = voices[name1] ?: ""
+            val file2 = voices[name2] ?: ""
+            val isCustom1 = file1 !in defaultVoiceFiles
+            val isCustom2 = file2 !in defaultVoiceFiles
+            when {
+                isCustom1 && !isCustom2 -> -1
+                !isCustom1 && isCustom2 -> 1
+                else -> name1.compareTo(name2, ignoreCase = true)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -142,6 +165,10 @@ fun MainScreen(
                             text = { Text(stringResource(AppR.string.action_lexicon)) },
                             onClick = { showMenu = false; onLexiconClick() },
                             enabled = currentLangCode != "ko"
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(AppR.string.action_custom_voices)) },
+                            onClick = { showMenu = false; onCustomVoicesClick() }
                         )
                         if (isV2Ready && currentLangCode == "en") {
                             DropdownMenuItem(
@@ -295,22 +322,43 @@ fun MainScreen(
 
                         DropdownSelector(
                             label = stringResource(AppR.string.voice_style_label),
-                            options = voices.keys.toList().sorted(),
+                            options = sortedVoiceNames,
                             selectedOption = voices.entries.find { it.value == selectedVoiceFile }?.key ?: "",
                             onOptionSelected = { name -> onVoiceChange(voices[name] ?: "M1.json") }
                         )
 
-                        OutlinedButton(
-                            onClick = onImportVoiceStyleClick,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(AppR.string.import_voice_style_button))
+                        val modelEngineOptions = listOf(
+                            stringResource(AppR.string.model_engine_default),
+                            stringResource(AppR.string.model_engine_v1),
+                            stringResource(AppR.string.model_engine_v2),
+                            stringResource(AppR.string.model_engine_v3)
+                        )
+                        val selectedEngineLabel = when (preferredModelEngine) {
+                            "v1" -> stringResource(AppR.string.model_engine_v1)
+                            "v2" -> stringResource(AppR.string.model_engine_v2)
+                            "v3" -> stringResource(AppR.string.model_engine_v3)
+                            else -> stringResource(AppR.string.model_engine_default)
                         }
+
+                        val defaultEngineLabel = stringResource(AppR.string.model_engine_default)
+                        val v1EngineLabel = stringResource(AppR.string.model_engine_v1)
+                        val v2EngineLabel = stringResource(AppR.string.model_engine_v2)
+                        val v3EngineLabel = stringResource(AppR.string.model_engine_v3)
+
+                        DropdownSelector(
+                            label = stringResource(AppR.string.model_engine_label),
+                            options = modelEngineOptions,
+                            selectedOption = selectedEngineLabel,
+                            onOptionSelected = { label ->
+                                val code = when (label) {
+                                    v1EngineLabel -> "v1"
+                                    v2EngineLabel -> "v2"
+                                    v3EngineLabel -> "v3"
+                                    else -> "default"
+                                }
+                                onPreferredModelEngineChange(code)
+                            }
+                        )
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -328,7 +376,7 @@ fun MainScreen(
                             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 DropdownSelector(
                                     label = stringResource(AppR.string.voice_style_2_label),
-                                    options = voices.keys.toList().sorted(),
+                                    options = sortedVoiceNames,
                                     selectedOption = voices.entries.find { it.value == selectedVoiceFile2 }?.key ?: "",
                                     onOptionSelected = { name -> onVoice2Change(voices[name] ?: "M2.json") }
                                 )
@@ -597,7 +645,9 @@ fun MainScreenPreview() {
             voices = mapOf("Voice 1" to "v1", "Voice 2" to "v2"),
             selectedVoiceFile = "v1",
             onVoiceChange = {},
-            onImportVoiceStyleClick = {},
+            preferredModelEngine = "default",
+            onPreferredModelEngineChange = {},
+            onCustomVoicesClick = {},
             isMixingEnabled = true,
             onMixingEnabledChange = {},
             selectedVoiceFile2 = "v2",

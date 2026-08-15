@@ -65,6 +65,10 @@ class SupertonicTextToSpeechService : TextToSpeechService() {
 
     private fun getCurrentModelVersion(): String {
         val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+        val engine = prefs.getString("preferred_model_engine", "default") ?: "default"
+        if (engine != "default" && engine.isNotEmpty()) {
+            return engine
+        }
         val savedLang = prefs.getString("selected_lang", "en") ?: "en"
         return AssetManager.getModelVersionForLanguage(savedLang)
     }

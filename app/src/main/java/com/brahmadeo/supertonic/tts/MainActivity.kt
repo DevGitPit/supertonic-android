@@ -45,6 +45,27 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import androidx.core.content.edit
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.foundation.text.ClickableText
 
 class MainActivity : ComponentActivity() {
 
@@ -232,7 +253,7 @@ class MainActivity : ComponentActivity() {
 
         // Initial setup based on saved language
         val savedLang = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).getString("selected_lang", MainViewModel.DEFAULT_LANG) ?: MainViewModel.DEFAULT_LANG
-        currentModelVersion = AssetManager.getModelVersionForLanguage(savedLang)
+        currentModelVersion = resolveModelVersion(savedLang)
 
         // On FIRST LAUNCH, we check/download the required version.
         // If English (default), we ensure V1 is ready.
@@ -398,6 +419,151 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    if (viewModel.showDeleteVoiceConfirmDialog.value) {
+                        val voiceName = viewModel.selectedVoiceFile.value.removeSuffix(".json")
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { viewModel.showDeleteVoiceConfirmDialog.value = false },
+                            title = { Text(getString(R.string.delete_voice_title)) },
+                            text = { Text(getString(R.string.delete_voice_message, voiceName)) },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        viewModel.showDeleteVoiceConfirmDialog.value = false
+                                        deleteVoiceStyle()
+                                    },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                ) { Text(getString(R.string.delete)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { viewModel.showDeleteVoiceConfirmDialog.value = false }) { Text(getString(R.string.cancel)) }
+                            }
+                        )
+                    }
+
+                    if (viewModel.showCustomVoicesDialog.value) {
+                        val defaultVoiceFiles = remember {
+                            listOf(
+                                "M1.json", "M2.json", "M3.json", "M4.json", "M5.json",
+                                "F1.json", "F2.json", "F3.json", "F4.json", "F5.json"
+                            )
+                        }
+                        val customVoices = remember(viewModel.voiceFiles.size, viewModel.selectedVoiceFile.value) {
+                            viewModel.voiceFiles.entries.filter { it.value !in defaultVoiceFiles }
+                        }
+                        
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { viewModel.showCustomVoicesDialog.value = false },
+                            title = { Text(getString(R.string.custom_voices_title)) },
+                            text = {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    Text(
+                                        text = getString(R.string.custom_voices_desc),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+
+                                    val uriHandler = LocalUriHandler.current
+                                    val annotatedString = buildAnnotatedString {
+                                        append("Tip: Voice styles are .json files containing speaker characteristics. You can extract them from your own voice recordings using the external python project: ")
+                                        pushStringAnnotation(tag = "URL", annotation = "https://github.com/saurabhv749/supertonic3-voice-clone")
+                                        withStyle(style = androidx.compose.ui.text.SpanStyle(
+                                            color = MaterialTheme.colorScheme.primary,
+                                            textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
+                                        )) {
+                                            append("supertonic3-voice-clone")
+                                        }
+                                        pop()
+                                        append(" on a computer.")
+                                    }
+
+                                    ClickableText(
+                                        text = annotatedString,
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        ),
+                                        onClick = { offset ->
+                                            annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                                                .firstOrNull()?.let { annotation ->
+                                                    try {
+                                                        uriHandler.openUri(annotation.item)
+                                                    } catch (e: Exception) {
+                                                        e.printStackTrace()
+                                                    }
+                                                }
+                                        }
+                                    )
+                                    
+                                    androidx.compose.material3.Button(
+                                        onClick = {
+                                            voiceStylePickerLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*"))
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = null
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(getString(R.string.import_voice_style_button))
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    
+                                    if (customVoices.isEmpty()) {
+                                        androidx.compose.material3.Text(
+                                            text = "No custom voices imported yet.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            modifier = Modifier.padding(vertical = 16.dp)
+                                        )
+                                    } else {
+                                        val scrollState = androidx.compose.foundation.rememberScrollState()
+                                        Column(
+                                            modifier = Modifier
+                                                .heightIn(max = 240.dp)
+                                                .verticalScroll(scrollState),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            for (entry in customVoices) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = entry.key,
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                    IconButton(
+                                                        onClick = {
+                                                            // We set the selected voice to this one so the deletion helper knows which file to delete
+                                                            viewModel.selectedVoiceFile.value = entry.value
+                                                            viewModel.showDeleteVoiceConfirmDialog.value = true
+                                                        }
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Delete,
+                                                            contentDescription = "Delete Voice",
+                                                            tint = MaterialTheme.colorScheme.error
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { viewModel.showCustomVoicesDialog.value = false }) {
+                                    Text(getString(R.string.close_button))
+                                }
+                            }
+                        )
+                    }
+
                     // Get localized placeholder and languages
                     val placeholder = remember(viewModel.currentLang.value) {
                         getLocalizedResource(this@MainActivity, viewModel.currentLang.value, R.string.default_input_text)
@@ -423,7 +589,7 @@ class MainActivity : ComponentActivity() {
                         languages = localizedLanguages,
                         currentLangCode = viewModel.currentLang.value,
                         onLangChange = { lang ->
-                            val targetVersion = AssetManager.getModelVersionForLanguage(lang)
+                            val targetVersion = resolveModelVersion(lang)
                             if (targetVersion == "v1") {
                                 viewModel.currentLang.value = lang
                                 saveStringPref("selected_lang", lang)
@@ -465,8 +631,12 @@ class MainActivity : ComponentActivity() {
                                 startService(resetIntent)
                             }
                         },
-                        onImportVoiceStyleClick = {
-                            voiceStylePickerLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*"))
+                        preferredModelEngine = viewModel.preferredModelEngine.value,
+                        onPreferredModelEngineChange = { newEngine ->
+                            onPreferredModelEngineChanged(newEngine)
+                        },
+                        onCustomVoicesClick = {
+                            viewModel.showCustomVoicesDialog.value = true
                         },
 
                         isMixingEnabled = viewModel.isMixingEnabled.value,
@@ -606,6 +776,7 @@ class MainActivity : ComponentActivity() {
         viewModel.currentSpeed.floatValue = prefs.getFloat("speed", MainViewModel.DEFAULT_SPEED)
         viewModel.currentSteps.intValue = prefs.getInt("diffusion_steps", MainViewModel.DEFAULT_STEPS)
         viewModel.isAdvancedNormalizationEnabled.value = prefs.getBoolean("is_advanced_normalization", false)
+        viewModel.preferredModelEngine.value = prefs.getString("preferred_model_engine", "default") ?: "default"
         val sMode = prefs.getInt("sibilance_reduction_mode", 1)
         viewModel.sibilanceMode.intValue = sMode
         SupertonicTTS.sibilanceMode = sMode
@@ -910,6 +1081,93 @@ class MainActivity : ComponentActivity() {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
+            }
+        }
+    }
+
+    private fun deleteVoiceStyle() {
+        val voiceFile = viewModel.selectedVoiceFile.value
+        val isDefault = voiceFile in listOf(
+            "M1.json", "M2.json", "M3.json", "M4.json", "M5.json",
+            "F1.json", "F2.json", "F3.json", "F4.json", "F5.json"
+        )
+        if (isDefault) return
+
+        try {
+            val file = File(filesDir, "$currentModelVersion/voice_styles/$voiceFile")
+            if (file.exists()) {
+                file.delete()
+            }
+            
+            val friendlyName = voiceFile.removeSuffix(".json")
+            
+            // Select default voice style
+            val defaultVoice = MainViewModel.DEFAULT_VOICE
+            viewModel.selectedVoiceFile.value = defaultVoice
+            saveStringPref("selected_voice", defaultVoice)
+            
+            // Refresh voices list
+            setupVoicesMap(currentModelVersion, viewModel.currentLang.value)
+            
+            // Reset playback service engine to reload style
+            val resetIntent = Intent(this, PlaybackService::class.java).apply {
+                action = "RESET_ENGINE"
+            }
+            startService(resetIntent)
+            
+            Toast.makeText(
+                this,
+                getString(R.string.delete_voice_success, friendlyName),
+                Toast.LENGTH_SHORT
+            ).show()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to delete voice style", e)
+            Toast.makeText(this, "Error deleting voice style: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun resolveModelVersion(lang: String): String {
+        val engine = viewModel.preferredModelEngine.value
+        return if (engine == "default" || engine.isEmpty()) {
+            AssetManager.getModelVersionForLanguage(lang)
+        } else {
+            engine
+        }
+    }
+
+    private fun onPreferredModelEngineChanged(newEngine: String) {
+        viewModel.preferredModelEngine.value = newEngine
+        saveStringPref("preferred_model_engine", newEngine)
+        
+        // Resolve new active model version
+        val targetVersion = resolveModelVersion(viewModel.currentLang.value)
+        
+        // Trigger model switch and/or download check
+        if (targetVersion == "v1") {
+            if (AssetManager.isV1Ready(this)) {
+                switchModel("v1")
+                val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
+                startService(resetIntent)
+            } else {
+                startDownload("v1")
+            }
+        } else if (targetVersion == "v2") {
+            if (AssetManager.isV2Ready(this)) {
+                switchModel("v2")
+                val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
+                startService(resetIntent)
+            } else {
+                viewModel.pendingLangCode = viewModel.currentLang.value
+                viewModel.showV2ConfirmDialog.value = true
+            }
+        } else if (targetVersion == "v3") {
+            if (AssetManager.isV3Ready(this)) {
+                switchModel("v3")
+                val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
+                startService(resetIntent)
+            } else {
+                viewModel.pendingLangCode = viewModel.currentLang.value
+                viewModel.showV3ConfirmDialog.value = true
             }
         }
     }
