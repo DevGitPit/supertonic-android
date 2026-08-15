@@ -208,6 +208,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val voiceStylePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { importVoiceStyle(it) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -458,6 +464,9 @@ class MainActivity : ComponentActivity() {
                                 val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
                                 startService(resetIntent)
                             }
+                        },
+                        onImportVoiceStyleClick = {
+                            voiceStylePickerLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*"))
                         },
 
                         isMixingEnabled = viewModel.isMixingEnabled.value,
@@ -819,6 +828,90 @@ class MainActivity : ComponentActivity() {
             putExtra(PlaybackActivity.EXTRA_LANG, viewModel.currentLang.value)
         }
         startActivity(intent)
+    }
+
+    private fun importVoiceStyle(uri: Uri) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val inputStream = contentResolver.openInputStream(uri) ?: return@launch
+                val jsonString = inputStream.bufferedReader().use { it.readText() }
+                
+                // Simple validation
+                val jsonObject = org.json.JSONObject(jsonString)
+                val hasTtl = jsonObject.has("style_ttl")
+                val hasDp = jsonObject.has("style_dp")
+                
+                if (!hasTtl || !hasDp) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, getString(R.string.import_voice_style_invalid), Toast.LENGTH_LONG).show()
+                    }
+                    return@launch
+                }
+                
+                // Resolve name
+                var displayName: String? = null
+                try {
+                    contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                        val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex != -1 && cursor.moveToFirst()) {
+                            displayName = cursor.getString(nameIndex)
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                
+                val fileName = if (!displayName.isNullOrBlank()) {
+                    val name = displayName!!
+                    if (!name.endsWith(".json", ignoreCase = true)) {
+                        "$name.json"
+                    } else {
+                        name
+                    }
+                } else {
+                    "custom_voice_${System.currentTimeMillis()}.json"
+                }
+                
+                // Sanitize file name (replace illegal chars with underscore)
+                val sanitizedFileName = fileName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                
+                // Save to active model version
+                val voiceDir = File(filesDir, "$currentModelVersion/voice_styles")
+                if (!voiceDir.exists()) {
+                    voiceDir.mkdirs()
+                }
+                
+                val destFile = File(voiceDir, sanitizedFileName)
+                destFile.writeText(jsonString)
+                
+                withContext(Dispatchers.Main) {
+                    // Refresh voice map
+                    setupVoicesMap(currentModelVersion, viewModel.currentLang.value)
+                    
+                    // Select new voice
+                    viewModel.selectedVoiceFile.value = sanitizedFileName
+                    saveStringPref("selected_voice", sanitizedFileName)
+                    
+                    // Reset playback service engine to reload style
+                    val resetIntent = Intent(this@MainActivity, PlaybackService::class.java).apply {
+                        action = "RESET_ENGINE"
+                    }
+                    startService(resetIntent)
+                    
+                    val friendlyName = sanitizedFileName.removeSuffix(".json")
+                    Toast.makeText(
+                        this@MainActivity,
+                        getString(R.string.import_voice_style_success, friendlyName),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Failed to import voice style", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     private fun extractUrl(text: String): String? {
