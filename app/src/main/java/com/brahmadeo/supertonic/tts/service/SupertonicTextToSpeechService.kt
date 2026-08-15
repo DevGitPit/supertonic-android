@@ -181,7 +181,18 @@ class SupertonicTextToSpeechService : TextToSpeechService() {
     override fun onGetVoices(): List<Voice> {
         val modelVersion = getCurrentModelVersion()
         val voicesList = mutableListOf<Voice>()
-        val voiceNames = listOf("M1", "M2", "M3", "M4", "M5", "F1", "F2", "F3", "F4", "F5")
+        val voiceNames = mutableListOf("M1", "M2", "M3", "M4", "M5", "F1", "F2", "F3", "F4", "F5")
+
+        val voiceStyleDir = File(filesDir, "$modelVersion/voice_styles")
+        if (voiceStyleDir.exists()) {
+            val files = voiceStyleDir.listFiles { _, name -> name.endsWith(".json") }
+            files?.forEach { file ->
+                val nameWithoutExt = file.name.removeSuffix(".json")
+                if (!voiceNames.contains(nameWithoutExt)) {
+                    voiceNames.add(nameWithoutExt)
+                }
+            }
+        }
 
         if (modelVersion == "v1") {
             // Only English Voices

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.MoreVert
@@ -55,6 +56,8 @@ fun MainScreen(
     voices: Map<String, String>,
     selectedVoiceFile: String,
     onVoiceChange: (String) -> Unit,
+
+    onImportVoiceStyleClick: () -> Unit,
 
     isMixingEnabled: Boolean,
     onMixingEnabledChange: (Boolean) -> Unit,
@@ -296,6 +299,18 @@ fun MainScreen(
                             selectedOption = voices.entries.find { it.value == selectedVoiceFile }?.key ?: "",
                             onOptionSelected = { name -> onVoiceChange(voices[name] ?: "M1.json") }
                         )
+
+                        OutlinedButton(
+                            onClick = onImportVoiceStyleClick,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(AppR.string.import_voice_style_button))
+                        }
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -582,6 +597,7 @@ fun MainScreenPreview() {
             voices = mapOf("Voice 1" to "v1", "Voice 2" to "v2"),
             selectedVoiceFile = "v1",
             onVoiceChange = {},
+            onImportVoiceStyleClick = {},
             isMixingEnabled = true,
             onMixingEnabledChange = {},
             selectedVoiceFile2 = "v2",

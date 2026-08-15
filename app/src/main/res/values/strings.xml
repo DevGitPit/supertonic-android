@@ -180,4 +180,9 @@
     <string name="sibilance_low_pass">Gentle Low-Pass (8.0kHz)</string>
     <string name="sibilance_deesser_aggressive">Dynamic De-Esser (Aggressive)</string>
     <string name="sibilance_reduction_label">Sibilance Reduction / De-Esser</string>
+
+    <!-- Custom Voice Styles -->
+    <string name="import_voice_style_button">Import Custom Voice Style (.json)</string>
+    <string name="import_voice_style_invalid">Invalid voice style JSON file</string>
+    <string name="import_voice_style_success">Imported custom voice style: %1$s</string>
 </resources>
