@@ -159,7 +159,10 @@ class EbookParser(private val context: Context) {
             return if (sentences.isEmpty()) listOf(text) else sentences
         }
 
-        val sharedConsumedTargets = HashMap<String, MutableSet<String>>()
+        private val sharedConsumedTargets =
+            java.util.Collections.synchronizedMap(
+                java.util.WeakHashMap<Publication, MutableMap<String, MutableSet<String>>>()
+            )
 
         fun cleanFootnoteElement(el: Element): String? {
             val copy = el.clone()
@@ -291,7 +294,10 @@ class EbookParser(private val context: Context) {
 
             val cleanFile = getRelativePath(resolvedFile)
             consumedTargetsByFile.getOrPut(cleanFile) { mutableSetOf() }.add(targetId)
-            sharedConsumedTargets.getOrPut(cleanFile) { mutableSetOf() }.add(targetId)
+            synchronized(sharedConsumedTargets) {
+                val targetsByFile = sharedConsumedTargets.getOrPut(publication) { HashMap() }
+                targetsByFile.getOrPut(cleanFile) { mutableSetOf() }.add(targetId)
+            }
 
             val noteText = cleanFootnoteElement(el) ?: return null
 
@@ -347,7 +353,9 @@ class EbookParser(private val context: Context) {
 
         val totalNotes = doc.select("li[id], aside[id], div[class*=footnote], p[class*=footnote], [epub\\:type~=footnote], [role=doc-footnote]").size
         val consumedFromInstance = noteResolverInstance?.consumedTargetsByFile?.get(cleanPath)?.size ?: 0
-        val consumedFromShared = sharedConsumedTargets[cleanPath]?.size ?: 0
+        val consumedFromShared = synchronized(sharedConsumedTargets) {
+            sharedConsumedTargets[publication]?.get(cleanPath)?.size ?: 0
+        }
         val consumed = maxOf(consumedFromInstance, consumedFromShared)
 
         return totalNotes >= 3 && consumed >= (totalNotes * 0.5)
