@@ -416,8 +416,8 @@ fun MainScreen(
                             label = stringResource(AppR.string.speed_label),
                             value = speed,
                             onValueChange = onSpeedChange,
-                            valueRange = 0.8f..2.5f,
-                            steps = 33,
+                            valueRange = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.SLIDER_MIN_SPEED..com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.SLIDER_MAX_SPEED,
+                            steps = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.SLIDER_STEPS,
                             displayValue = String.format(Locale.US, "%.2fx", speed),
                             leadingIcon = Icons.Default.Speed,
                             isSpeedSlider = true

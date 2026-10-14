@@ -134,9 +134,12 @@ class SupertonicTextToSpeechService : TextToSpeechService() {
         if (voiceName.contains("-supertonic-")) {
             val langPrefix = voiceName.substringBefore("-supertonic-")
             val styleName = voiceName.substringAfter("-supertonic-")
-            val modelVersion = getCurrentModelVersion()
+            val prefs = attributionContext.getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+            val preferredEngine = prefs.getString("preferred_model_engine", "default") ?: "default"
+            val modelVersion = AssetManager.resolveModelVersion(preferredEngine, langPrefix)
             if (AssetManager.isLanguageSupported(modelVersion, langPrefix)) {
-                val file = File(filesDir, "$modelVersion/voice_styles/$styleName.json")
+                val sanitizedStyleName = File(styleName).name
+                val file = File(filesDir, "$modelVersion/voice_styles/$sanitizedStyleName.json")
                 if (file.exists()) return TextToSpeech.SUCCESS
             }
         }

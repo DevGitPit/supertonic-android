@@ -96,7 +96,7 @@ class CheckDataActivity : Activity() {
             }
         }
 
-        val result = if (modelVersion == "v1" || availableVoices.isNotEmpty()) {
+        val result = if (availableVoices.isNotEmpty()) {
             TextToSpeech.Engine.CHECK_VOICE_DATA_PASS
         } else {
             TextToSpeech.Engine.CHECK_VOICE_DATA_FAIL

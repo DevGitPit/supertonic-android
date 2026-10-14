@@ -848,11 +848,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun startDownload(version: String) {
+    private fun startDownload(version: String, onComplete: ((String) -> Unit)? = null) {
         viewModel.startDownload(this, version) { completedVersion ->
-            initializeEngine(completedVersion)
-            val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
-            startService(resetIntent)
+            if (onComplete != null) {
+                onComplete(completedVersion)
+            } else if (completedVersion == "v1" && viewModel.pendingEngineCode.isNotEmpty()) {
+                val engine = viewModel.pendingEngineCode
+                val lang = viewModel.pendingLangCode.ifEmpty { "en" }
+                viewModel.pendingEngineCode = ""
+                viewModel.pendingLangCode = ""
+                applyPreferredModelEngine(engine, "v1", lang)
+            } else {
+                initializeEngine(completedVersion)
+                val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
+                startService(resetIntent)
+            }
         }
     }
 
@@ -1094,25 +1104,25 @@ class MainActivity : ComponentActivity() {
                 
                 val fileName = if (!displayName.isNullOrBlank()) {
                     val name = displayName!!
-                    if (!name.endsWith(".json", ignoreCase = true)) {
-                        "$name.json"
+                    val baseName = if (name.endsWith(".json", ignoreCase = true)) {
+                        name.substring(0, name.length - 5)
                     } else {
                         name
                     }
+                    val sanitizedBaseName = baseName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                    "$sanitizedBaseName.json"
                 } else {
                     "custom_voice_${System.currentTimeMillis()}.json"
                 }
                 
-                // Sanitize file name (replace illegal chars with underscore)
-                val sanitizedFileName = fileName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
                 val defaultVoiceFiles = setOf(
                     "m1.json", "m2.json", "m3.json", "m4.json", "m5.json",
                     "f1.json", "f2.json", "f3.json", "f4.json", "f5.json"
                 )
-                val finalFileName = if (defaultVoiceFiles.contains(sanitizedFileName.lowercase())) {
-                    "custom_$sanitizedFileName"
+                val finalFileName = if (defaultVoiceFiles.contains(fileName.lowercase())) {
+                    "custom_$fileName"
                 } else {
-                    sanitizedFileName
+                    fileName
                 }
                 
                 // Save to active model version
@@ -1165,8 +1175,10 @@ class MainActivity : ComponentActivity() {
 
         try {
             val file = File(filesDir, "$currentModelVersion/voice_styles/$voiceFile")
-            if (file.exists()) {
-                file.delete()
+            val deleted = file.exists() && file.delete()
+            if (!deleted) {
+                Toast.makeText(this, "Failed to delete voice style file", Toast.LENGTH_LONG).show()
+                return
             }
             
             val friendlyName = voiceFile.removeSuffix(".json")
@@ -1219,7 +1231,11 @@ class MainActivity : ComponentActivity() {
             } else if (targetVersion == "v3") {
                 viewModel.showV3ConfirmDialog.value = true
             } else {
-                startDownload("v1")
+                startDownload("v1") {
+                    viewModel.pendingEngineCode = ""
+                    viewModel.pendingLangCode = ""
+                    applyPreferredModelEngine(newEngine, "v1", sanitizedLang)
+                }
             }
             return
         }

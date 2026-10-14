@@ -168,7 +168,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
     fun getPlaybackSpeed(): Float = playbackSpeed
 
     fun setPlaybackSpeed(speed: Float) {
-        val clamped = speed.coerceIn(0.5f, 3.0f)
+        val clamped = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.clampPlaybackSpeed(speed)
         playbackSpeed = clamped
         getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).edit {
             putFloat("last_speed", clamped)
@@ -320,7 +320,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
     private var loadChapterJob: Job? = null
 
     fun synthesizeAndPlay(text: String, lang: String, stylePath: String, speed: Float, steps: Int, startIndex: Int = 0) {
-        val clampedSpeed = speed.coerceIn(0.5f, 3.0f)
+        val clampedSpeed = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.clampPlaybackSpeed(speed)
         playbackSpeed = clampedSpeed
         getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).edit {
             putFloat("last_speed", clampedSpeed)

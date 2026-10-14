@@ -462,7 +462,7 @@ fun PlaybackScreen(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         // Preset Chips
-                        val presets = listOf(0.8f, 1.0f, 1.10f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f)
+                        val presets = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.SPEED_PRESETS
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -471,7 +471,7 @@ fun PlaybackScreen(
                         ) {
                             presets.forEach { preset ->
                                 val isSelected = Math.abs(currentSpeed - preset) < 0.02f
-                                val isPresetHigh = preset > 1.5f
+                                val isPresetHigh = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.isHighSpeed(preset)
                                 FilterChip(
                                     selected = isSelected,
                                     onClick = { onSpeedChange(preset) },
@@ -571,8 +571,8 @@ fun PlaybackScreen(
                                 Slider(
                                     value = currentSpeed,
                                     onValueChange = onSpeedChange,
-                                    valueRange = 0.8f..2.5f,
-                                    steps = 33,
+                                    valueRange = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.SLIDER_MIN_SPEED..com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.SLIDER_MAX_SPEED,
+                                    steps = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.SLIDER_STEPS,
                                     colors = SliderDefaults.colors(
                                         thumbColor = accentColor,
                                         activeTrackColor = accentColor,
