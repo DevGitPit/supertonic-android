@@ -152,6 +152,11 @@ class MainActivity : ComponentActivity() {
         }
         override fun onTransitioningChanged(isTransitioning: Boolean) { }
         override fun onSleepTimerUpdated(secondsRemaining: Int) { }
+        override fun onSpeedChanged(speed: Float) {
+            runOnUiThread {
+                viewModel.currentSpeed.floatValue = speed
+            }
+        }
     }
 
     private val connection = object : ServiceConnection {
@@ -329,16 +334,15 @@ class MainActivity : ComponentActivity() {
                             confirmButton = {
                                 TextButton(onClick = {
                                     val lang = viewModel.pendingLangCode
-                                    viewModel.currentLang.value = lang
-                                    saveStringPref("selected_lang", lang)
+                                    val engine = viewModel.pendingEngineCode.ifEmpty { "v2" }
+                                    viewModel.pendingEngineCode = ""
                                     viewModel.showV2ConfirmDialog.value = false
-                                    switchModel("v2")
-                                    val resetIntent = Intent(this@MainActivity, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
-                                    startService(resetIntent)
+                                    applyPreferredModelEngine(engine, "v2", lang)
                                 }) { Text(getString(R.string.v2_download_button)) }
                             },
                             dismissButton = {
                                  TextButton(onClick = {
+                                     viewModel.pendingEngineCode = ""
                                      viewModel.showV2ConfirmDialog.value = false
                                  }) { Text(getString(R.string.cancel)) }
                             }
@@ -376,6 +380,10 @@ class MainActivity : ComponentActivity() {
                                     onClick = {
                                         AssetManager.deleteVersion(this@MainActivity, "v2")
                                         viewModel.showV2DeleteDialog.value = false
+                                        if (viewModel.preferredModelEngine.value == "v2") {
+                                            viewModel.preferredModelEngine.value = "default"
+                                            saveStringPref("preferred_model_engine", "default")
+                                        }
                                         // Ensure we are on English/V1
                                         viewModel.currentLang.value = "en"
                                         saveStringPref("selected_lang", "en")
@@ -396,6 +404,7 @@ class MainActivity : ComponentActivity() {
                     if (viewModel.showV3ConfirmDialog.value) {
                         androidx.compose.material3.AlertDialog(
                              onDismissRequest = { 
+                                 viewModel.pendingEngineCode = ""
                                  viewModel.showV3ConfirmDialog.value = false
                              },
                             title = { Text(getString(R.string.v3_download_title)) },
@@ -403,16 +412,15 @@ class MainActivity : ComponentActivity() {
                             confirmButton = {
                                 TextButton(onClick = {
                                     val lang = viewModel.pendingLangCode
-                                    viewModel.currentLang.value = lang
-                                    saveStringPref("selected_lang", lang)
+                                    val engine = viewModel.pendingEngineCode.ifEmpty { "v3" }
+                                    viewModel.pendingEngineCode = ""
                                     viewModel.showV3ConfirmDialog.value = false
-                                    switchModel("v3")
-                                    val resetIntent = Intent(this@MainActivity, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
-                                    startService(resetIntent)
+                                    applyPreferredModelEngine(engine, "v3", lang)
                                 }) { Text(getString(R.string.v3_download_button)) }
                             },
                             dismissButton = {
                                  TextButton(onClick = {
+                                     viewModel.pendingEngineCode = ""
                                      viewModel.showV3ConfirmDialog.value = false
                                  }) { Text(getString(R.string.cancel)) }
                             }
@@ -429,6 +437,10 @@ class MainActivity : ComponentActivity() {
                                     onClick = {
                                         AssetManager.deleteVersion(this@MainActivity, "v3")
                                         viewModel.showV3DeleteDialog.value = false
+                                        if (viewModel.preferredModelEngine.value == "v3") {
+                                            viewModel.preferredModelEngine.value = "default"
+                                            saveStringPref("preferred_model_engine", "default")
+                                        }
                                         // Ensure we are on English/V1
                                         viewModel.currentLang.value = "en"
                                         saveStringPref("selected_lang", "en")
@@ -784,7 +796,14 @@ class MainActivity : ComponentActivity() {
     private fun loadPreferences() {
         val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
         viewModel.inputText.value = "" // Do not load user text from cleartext storage
-        viewModel.currentLang.value = prefs.getString("selected_lang", MainViewModel.DEFAULT_LANG) ?: MainViewModel.DEFAULT_LANG
+        viewModel.preferredModelEngine.value = prefs.getString("preferred_model_engine", "default") ?: "default"
+        val rawLang = prefs.getString("selected_lang", MainViewModel.DEFAULT_LANG) ?: MainViewModel.DEFAULT_LANG
+        val targetVersion = resolveModelVersion(rawLang)
+        val sanitizedLang = AssetManager.sanitizeLanguageForModel(targetVersion, rawLang)
+        viewModel.currentLang.value = sanitizedLang
+        if (sanitizedLang != rawLang) {
+            saveStringPref("selected_lang", sanitizedLang)
+        }
         viewModel.selectedVoiceFile.value = prefs.getString("selected_voice", MainViewModel.DEFAULT_VOICE) ?: MainViewModel.DEFAULT_VOICE
         viewModel.selectedVoiceFile2.value = prefs.getString("selected_voice_2", MainViewModel.DEFAULT_VOICE_2) ?: MainViewModel.DEFAULT_VOICE_2
         viewModel.isMixingEnabled.value = prefs.getBoolean("is_mixing_enabled", false)
@@ -792,7 +811,6 @@ class MainActivity : ComponentActivity() {
         viewModel.currentSpeed.floatValue = prefs.getFloat("speed", MainViewModel.DEFAULT_SPEED)
         viewModel.currentSteps.intValue = prefs.getInt("diffusion_steps", MainViewModel.DEFAULT_STEPS)
         viewModel.isAdvancedNormalizationEnabled.value = prefs.getBoolean("is_advanced_normalization", false)
-        viewModel.preferredModelEngine.value = prefs.getString("preferred_model_engine", "default") ?: "default"
         val sMode = prefs.getInt("sibilance_reduction_mode", 1)
         viewModel.sibilanceMode.intValue = sMode
         SupertonicTTS.sibilanceMode = sMode
@@ -823,6 +841,8 @@ class MainActivity : ComponentActivity() {
     private fun startDownload(version: String) {
         viewModel.startDownload(this, version) { completedVersion ->
             initializeEngine(completedVersion)
+            val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
+            startService(resetIntent)
         }
     }
 
@@ -857,9 +877,11 @@ class MainActivity : ComponentActivity() {
                 SupertonicTTS.initialize(modelPath, libPath)
             }
 
-            if (success) {
-                withContext(Dispatchers.Main) {
-                    viewModel.isInitializing.value = false
+            withContext(Dispatchers.Main) {
+                viewModel.isInitializing.value = false
+                if (!success) {
+                    Log.e("MainActivity", "Failed to initialize engine for $version")
+                    Toast.makeText(this@MainActivity, "Failed to initialize TTS engine", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -915,6 +937,18 @@ class MainActivity : ComponentActivity() {
                     viewModel.voiceFiles[friendlyName] = file.name
                 }
             }
+        }
+
+        // Validate that currently selected voices exist in the updated map
+        if (!viewModel.voiceFiles.values.contains(viewModel.selectedVoiceFile.value)) {
+            val fallbackVoice = "F3.json"
+            viewModel.selectedVoiceFile.value = fallbackVoice
+            saveStringPref("selected_voice", fallbackVoice)
+        }
+        if (!viewModel.voiceFiles.values.contains(viewModel.selectedVoiceFile2.value)) {
+            val fallbackVoice2 = "M2.json"
+            viewModel.selectedVoiceFile2.value = fallbackVoice2
+            saveStringPref("selected_voice_2", fallbackVoice2)
         }
     }
 
@@ -1143,49 +1177,57 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun resolveModelVersion(lang: String): String {
-        val engine = viewModel.preferredModelEngine.value
-        return if (engine == "default" || engine.isEmpty()) {
-            AssetManager.getModelVersionForLanguage(lang)
-        } else {
-            engine
-        }
+        return AssetManager.resolveModelVersion(viewModel.preferredModelEngine.value, lang)
     }
 
     private fun onPreferredModelEngineChanged(newEngine: String) {
-        viewModel.preferredModelEngine.value = newEngine
-        saveStringPref("preferred_model_engine", newEngine)
-        
+        val currentEngine = viewModel.preferredModelEngine.value
+        if (currentEngine == newEngine) return
+
         // Resolve new active model version
-        val targetVersion = resolveModelVersion(viewModel.currentLang.value)
-        
-        // Trigger model switch and/or download check
-        if (targetVersion == "v1") {
-            if (AssetManager.isV1Ready(this)) {
-                switchModel("v1")
-                val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
-                startService(resetIntent)
+        val targetVersion = AssetManager.resolveModelVersion(newEngine, viewModel.currentLang.value)
+        val sanitizedLang = AssetManager.sanitizeLanguageForModel(targetVersion, viewModel.currentLang.value)
+
+        val isReady = AssetManager.isVersionReady(this, targetVersion)
+        if (!isReady) {
+            viewModel.pendingLangCode = sanitizedLang
+            viewModel.pendingEngineCode = newEngine
+            if (targetVersion == "v2") {
+                viewModel.showV2ConfirmDialog.value = true
+            } else if (targetVersion == "v3") {
+                viewModel.showV3ConfirmDialog.value = true
             } else {
                 startDownload("v1")
             }
-        } else if (targetVersion == "v2") {
-            if (AssetManager.isV2Ready(this)) {
-                switchModel("v2")
-                val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
-                startService(resetIntent)
-            } else {
-                viewModel.pendingLangCode = viewModel.currentLang.value
-                viewModel.showV2ConfirmDialog.value = true
-            }
-        } else if (targetVersion == "v3") {
-            if (AssetManager.isV3Ready(this)) {
-                switchModel("v3")
-                val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
-                startService(resetIntent)
-            } else {
-                viewModel.pendingLangCode = viewModel.currentLang.value
-                viewModel.showV3ConfirmDialog.value = true
-            }
+            return
         }
+
+        applyPreferredModelEngine(newEngine, targetVersion, sanitizedLang)
+    }
+
+    private fun applyPreferredModelEngine(newEngine: String, targetVersion: String, sanitizedLang: String) {
+        viewModel.preferredModelEngine.value = newEngine
+        saveStringPref("preferred_model_engine", newEngine)
+
+        if (sanitizedLang != viewModel.currentLang.value) {
+            viewModel.currentLang.value = sanitizedLang
+        }
+        saveStringPref("selected_lang", sanitizedLang)
+
+        currentModelVersion = targetVersion
+        setupVoicesMap(targetVersion, sanitizedLang)
+
+        if (!viewModel.voiceFiles.values.contains(viewModel.selectedVoiceFile.value)) {
+            val fallbackVoice = "F3.json"
+            viewModel.selectedVoiceFile.value = fallbackVoice
+            saveStringPref("selected_voice", fallbackVoice)
+        } else {
+            saveStringPref("selected_voice", viewModel.selectedVoiceFile.value)
+        }
+
+        switchModel(targetVersion)
+        val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
+        startService(resetIntent)
     }
 
     private fun extractUrl(text: String): String? {

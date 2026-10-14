@@ -22,6 +22,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
@@ -56,11 +57,12 @@ class PlaybackActivity : ComponentActivity() {
     private var exportCurrentState = mutableIntStateOf(0)
     private var exportTotalState = mutableIntStateOf(0)
     private val sleepTimerSecondsState = mutableIntStateOf(0)
+    private val currentSpeedState = mutableFloatStateOf(1.10f)
 
     // State persistence
     private var currentText = ""
     private var currentVoicePath = ""
-    private var currentSpeed = 1.0f
+    private var currentSpeed = 1.10f
     private var currentSteps = 5
     private var currentLang = "en"
     private var currentBookPath: String? = null
@@ -147,6 +149,13 @@ class PlaybackActivity : ComponentActivity() {
                 sleepTimerSecondsState.intValue = secondsRemaining
             }
         }
+
+        override fun onSpeedChanged(speed: Float) {
+            runOnUiThread {
+                currentSpeed = speed
+                currentSpeedState.floatValue = speed
+            }
+        }
     }
 
     private val connection = object : ServiceConnection {
@@ -155,6 +164,12 @@ class PlaybackActivity : ComponentActivity() {
             try {
                 playbackService?.setListener(playbackListenerStub)
                 isBound = true
+
+                val serviceSpeed = try { playbackService?.speed ?: -1f } catch (_: Exception) { -1f }
+                if (serviceSpeed > 0f) {
+                    currentSpeed = serviceSpeed
+                    currentSpeedState.floatValue = serviceSpeed
+                }
 
                 val isResumeExtra = intent.getBooleanExtra("is_resume", false)
                 val hasTextExtra = intent.hasExtra(EXTRA_TEXT)
@@ -208,6 +223,17 @@ class PlaybackActivity : ComponentActivity() {
                         exportCurrent = exportCurrentState.intValue,
                         exportTotal = exportTotalState.intValue,
                         sleepTimerSecondsRemaining = sleepTimerSecondsState.intValue,
+                        currentSpeed = currentSpeedState.floatValue,
+                        onSpeedChange = { newSpeed ->
+                            currentSpeed = newSpeed
+                            currentSpeedState.floatValue = newSpeed
+                            saveState()
+                            try {
+                                playbackService?.setSpeed(newSpeed)
+                            } catch (e: RemoteException) {
+                                e.printStackTrace()
+                            }
+                        },
                         onBackClick = { finish() },
                         onHomeClick = {
                             val intent = Intent(this@PlaybackActivity, MainActivity::class.java).apply {
@@ -260,7 +286,8 @@ class PlaybackActivity : ComponentActivity() {
             val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
             currentText = prefs.getString("last_text", "") ?: ""
             currentVoicePath = prefs.getString("last_voice_path", "") ?: ""
-            currentSpeed = prefs.getFloat("last_speed", 1.0f)
+            currentSpeed = prefs.getFloat("last_speed", 1.10f)
+            currentSpeedState.floatValue = currentSpeed
             currentSteps = prefs.getInt("last_steps", 5)
             currentLang = prefs.getString("last_lang", "en") ?: "en"
             currentIndexState.intValue = prefs.getInt("last_index", 0)
@@ -270,7 +297,8 @@ class PlaybackActivity : ComponentActivity() {
         } else {
             currentText = intent.getStringExtra(EXTRA_TEXT) ?: ""
             currentVoicePath = intent.getStringExtra(EXTRA_VOICE_PATH) ?: ""
-            currentSpeed = intent.getFloatExtra(EXTRA_SPEED, 1.0f)
+            currentSpeed = intent.getFloatExtra(EXTRA_SPEED, 1.10f)
+            currentSpeedState.floatValue = currentSpeed
             currentSteps = intent.getIntExtra(EXTRA_STEPS, 5)
             currentLang = intent.getStringExtra(EXTRA_LANG) ?: "en"
             currentBookPath = intent.getStringExtra(EXTRA_BOOK_PATH)
@@ -295,7 +323,8 @@ class PlaybackActivity : ComponentActivity() {
         if (newText.isNotEmpty() && newText != currentText) {
             currentText = newText
             currentVoicePath = prefs.getString("last_voice_path", "") ?: ""
-            currentSpeed = prefs.getFloat("last_speed", 1.0f)
+            currentSpeed = prefs.getFloat("last_speed", 1.10f)
+            currentSpeedState.floatValue = currentSpeed
             currentSteps = prefs.getInt("last_steps", 5)
             currentLang = prefs.getString("last_lang", "en") ?: "en"
             currentBookPath = prefs.getString("last_book_path", null)
@@ -309,6 +338,11 @@ class PlaybackActivity : ComponentActivity() {
         } else {
             if (isBound && playbackService != null) {
                 try {
+                    val serviceSpeed = playbackService?.speed ?: -1f
+                    if (serviceSpeed > 0f) {
+                        currentSpeed = serviceSpeed
+                        currentSpeedState.floatValue = serviceSpeed
+                    }
                     val serviceIndex = playbackService?.getCurrentIndex() ?: -1
                     if (serviceIndex != -1) {
                         currentIndexState.intValue = serviceIndex
@@ -447,6 +481,7 @@ class PlaybackActivity : ComponentActivity() {
             putString("last_text", currentText)
                 .putString("last_voice_path", currentVoicePath)
                 .putFloat("last_speed", currentSpeed)
+                .putFloat("speed", currentSpeed)
                 .putInt("last_steps", currentSteps)
                 .putString("last_lang", currentLang)
                 .putBoolean("is_playing", true)

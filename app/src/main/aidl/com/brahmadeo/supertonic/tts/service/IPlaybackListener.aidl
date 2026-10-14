@@ -8,4 +8,5 @@ interface IPlaybackListener {
     oneway void onChapterChanged(String newText, String chapterHref, int pageIndex);
     oneway void onTransitioningChanged(boolean isTransitioning);
     oneway void onSleepTimerUpdated(int secondsRemaining);
+    oneway void onSpeedChanged(float speed);
 }

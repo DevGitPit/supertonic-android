@@ -12,12 +12,50 @@ import java.net.URI
 import kotlin.time.Duration.Companion.milliseconds
 
 object AssetManager {
+    val V1_LANGUAGES = setOf("en")
+    val V2_LANGUAGES = setOf("en", "fr", "pt", "es", "ko")
+    val V3_LANGUAGES = setOf(
+        "en", "ko", "ja", "ar", "bg", "cs", "da", "de", "el", "es", "et", "fi", "fr", "hi", "hr",
+        "hu", "id", "it", "lt", "lv", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "tr", "uk",
+        "vi", "na"
+    )
+
     fun getModelVersionForLanguage(lang: String): String {
         val cleanLang = lang.lowercase().substringBefore("-").substringBefore("_")
         return when (cleanLang) {
             "en" -> "v1"
             "fr", "pt", "es", "ko" -> "v2"
             else -> "v3"
+        }
+    }
+
+    fun isLanguageSupported(version: String, lang: String): Boolean {
+        val cleanLang = lang.lowercase().substringBefore("-").substringBefore("_")
+        return when (version) {
+            "v1" -> cleanLang in V1_LANGUAGES
+            "v2" -> cleanLang in V2_LANGUAGES
+            "v3" -> cleanLang in V3_LANGUAGES
+            else -> true
+        }
+    }
+
+    fun sanitizeLanguageForModel(version: String, currentLang: String): String {
+        return if (isLanguageSupported(version, currentLang)) {
+            currentLang
+        } else {
+            "en"
+        }
+    }
+
+    fun resolveModelVersion(preferredEngine: String, lang: String): String {
+        return if (preferredEngine == "default" || preferredEngine.isEmpty()) {
+            getModelVersionForLanguage(lang)
+        } else {
+            if (isLanguageSupported(preferredEngine, lang)) {
+                preferredEngine
+            } else {
+                getModelVersionForLanguage(lang)
+            }
         }
     }
 

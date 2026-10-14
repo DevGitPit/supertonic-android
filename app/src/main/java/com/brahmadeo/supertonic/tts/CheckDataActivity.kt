@@ -18,28 +18,37 @@ class CheckDataActivity : Activity() {
 
         val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
         val savedLang = prefs.getString("selected_lang", "en") ?: "en"
-        val modelVersion = com.brahmadeo.supertonic.tts.utils.AssetManager.getModelVersionForLanguage(savedLang)
+        val preferredEngine = prefs.getString("preferred_model_engine", "default") ?: "default"
+        val modelVersion = com.brahmadeo.supertonic.tts.utils.AssetManager.resolveModelVersion(preferredEngine, savedLang)
 
         val availableVoices = ArrayList<String>()
         val unavailableVoices = ArrayList<String>()
 
         if (modelVersion == "v1") {
-            // English (v1) is bundled with the app and copied on first run
-            availableVoices.add("eng-USA")
-        } else {
-            // Check if multilingual models (v2) are present
-            val v2Dir = File(filesDir, "v2/onnx")
-            if (v2Dir.exists()) {
-                availableVoices.add("kor-KOR")
-                availableVoices.add("spa-ESP")
-                availableVoices.add("por-PRT")
-                availableVoices.add("fra-FRA")
+            // English (v1)
+            val v1Dir = File(filesDir, "v1/onnx")
+            if (v1Dir.exists()) {
+                availableVoices.add("eng-USA")
             } else {
-                // These could be downloaded via the app's UI
-                unavailableVoices.add("kor-KOR")
-                unavailableVoices.add("spa-ESP")
-                unavailableVoices.add("por-PRT")
-                unavailableVoices.add("fra-FRA")
+                unavailableVoices.add("eng-USA")
+            }
+        } else if (modelVersion == "v2") {
+            // Multilingual models (v2)
+            val v2Dir = File(filesDir, "v2/onnx")
+            val v2Langs = listOf("eng-USA", "kor-KOR", "spa-ESP", "por-PRT", "fra-FRA")
+            if (v2Dir.exists()) {
+                availableVoices.addAll(v2Langs)
+            } else {
+                unavailableVoices.addAll(v2Langs)
+            }
+        } else {
+            // Multilingual models (v3)
+            val v3Dir = File(filesDir, "v3/onnx")
+            val v3Langs = listOf("eng-USA", "kor-KOR", "spa-ESP", "por-PRT", "fra-FRA", "jpn-JPN", "deu-DEU")
+            if (v3Dir.exists()) {
+                availableVoices.addAll(v3Langs)
+            } else {
+                unavailableVoices.addAll(v3Langs)
             }
         }
 

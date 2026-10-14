@@ -28,6 +28,7 @@ object SupertonicTTS {
     private external fun init(modelPath: String, libPath: String, ortThreads: Int, xnnThreads: Int): Long
     private external fun synthesize(ptr: Long, text: String, lang: String, stylePath: String, speed: Float, bufferSeconds: Float, steps: Int, gain: Float, sibilanceMode: Int): ByteArray
     private external fun getSocClass(ptr: Long): Int
+    private external fun getModelVersion(ptr: Long): Int
     private external fun getSampleRate(ptr: Long): Int
     private external fun close(ptr: Long)
     private external fun reset(ptr: Long)
@@ -131,7 +132,8 @@ object SupertonicTTS {
         currentSession.set(SessionContext(sid, listener))
         
         try {
-            val data = synthesize(nativePtr, text, lang, stylePath, speed, bufferDuration, steps, gain, sibilanceMode)
+            val safeSpeed = speed.coerceIn(0.5f, 1.4f)
+            val data = synthesize(nativePtr, text, lang, stylePath, safeSpeed, bufferDuration, steps, gain, sibilanceMode)
             return if (data.isNotEmpty()) data else null
         } catch (e: Exception) {
             Log.e("SupertonicTTS", "Native synthesis exception: ${e.message}")
@@ -145,6 +147,12 @@ object SupertonicTTS {
     fun getSoC(): Int {
         if (nativePtr == 0L) return -1
         return getSocClass(nativePtr)
+    }
+
+    @Synchronized
+    fun getModelVersion(): Int {
+        if (nativePtr == 0L) return 0
+        return getModelVersion(nativePtr)
     }
 
     @Synchronized

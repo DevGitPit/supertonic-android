@@ -1,6 +1,11 @@
 package com.brahmadeo.supertonic.tts.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import java.util.Locale
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -411,10 +416,11 @@ fun MainScreen(
                             label = stringResource(AppR.string.speed_label),
                             value = speed,
                             onValueChange = onSpeedChange,
-                            valueRange = 0.9f..1.5f,
-                            steps = 11,
+                            valueRange = 0.8f..2.5f,
+                            steps = 33,
                             displayValue = String.format(Locale.US, "%.2fx", speed),
-                            leadingIcon = Icons.Default.Speed
+                            leadingIcon = Icons.Default.Speed,
+                            isSpeedSlider = true
                         )
 
                         SliderWithLabel(
@@ -568,29 +574,122 @@ fun SliderWithLabel(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
     displayValue: String,
-    leadingIcon: ImageVector? = null
+    leadingIcon: ImageVector? = null,
+    isSpeedSlider: Boolean = false
 ) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(), 
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (leadingIcon != null) {
-                    Icon(leadingIcon, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Text(displayValue, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+    if (isSpeedSlider) {
+        val isHighSpeed = value > 1.5f
+        val isDark = isSystemInDarkTheme()
+
+        // Green styling for <= 1.5x, reddish/error styling for > 1.5x based on theme
+        val targetContainerBg = if (isHighSpeed) {
+            if (isDark) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+            else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
+        } else {
+            if (isDark) Color(0xFF1B3B22).copy(alpha = 0.45f)
+            else Color(0xFFE8F5E9).copy(alpha = 0.85f)
         }
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = valueRange,
-            steps = steps
-        )
+
+        val targetBorderColor = if (isHighSpeed) {
+            MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+        } else {
+            if (isDark) Color(0xFF81C784).copy(alpha = 0.4f)
+            else Color(0xFF4CAF50).copy(alpha = 0.5f)
+        }
+
+        val targetAccentColor = if (isHighSpeed) {
+            MaterialTheme.colorScheme.error
+        } else {
+            if (isDark) Color(0xFF81C784)
+            else Color(0xFF2E7D32)
+        }
+
+        val targetInactiveTrack = if (isHighSpeed) {
+            MaterialTheme.colorScheme.error.copy(alpha = 0.24f)
+        } else {
+            if (isDark) Color(0xFF2E7D32).copy(alpha = 0.3f)
+            else Color(0xFFA5D6A7).copy(alpha = 0.6f)
+        }
+
+        val containerBg by animateColorAsState(targetValue = targetContainerBg, label = "speed_bg")
+        val borderColor by animateColorAsState(targetValue = targetBorderColor, label = "speed_border")
+        val accentColor by animateColorAsState(targetValue = targetAccentColor, label = "speed_accent")
+        val inactiveTrackColor by animateColorAsState(targetValue = targetInactiveTrack, label = "speed_inactive_track")
+
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = containerBg,
+            border = BorderStroke(1.dp, borderColor),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (leadingIcon != null) {
+                            Icon(leadingIcon, contentDescription = null, modifier = Modifier.size(18.dp), tint = accentColor)
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = accentColor.copy(alpha = 0.15f),
+                            modifier = Modifier.padding(end = 6.dp)
+                        ) {
+                            Text(
+                                text = if (isHighSpeed) "Fast (DSP)" else "Natural",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = accentColor,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Text(displayValue, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = accentColor)
+                    }
+                }
+                Slider(
+                    value = value,
+                    onValueChange = onValueChange,
+                    valueRange = valueRange,
+                    steps = steps,
+                    colors = SliderDefaults.colors(
+                        thumbColor = accentColor,
+                        activeTrackColor = accentColor,
+                        inactiveTrackColor = inactiveTrackColor,
+                        activeTickColor = Color.Transparent,
+                        inactiveTickColor = Color.Transparent
+                    )
+                )
+            }
+        }
+    } else {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(), 
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (leadingIcon != null) {
+                        Icon(leadingIcon, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(displayValue, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            }
+            Slider(
+                value = value,
+                onValueChange = onValueChange,
+                valueRange = valueRange,
+                steps = steps
+            )
+        }
     }
 }
 

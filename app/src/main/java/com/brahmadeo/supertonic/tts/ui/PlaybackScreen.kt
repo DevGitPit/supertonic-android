@@ -5,10 +5,14 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Close
@@ -17,13 +21,16 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Snooze
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Locale
 import com.brahmadeo.supertonic.tts.ui.components.IndeterminateWavyProgressIndicator
 import com.brahmadeo.supertonic.tts.ui.components.WavyCircularProgressIndicator
 import com.brahmadeo.supertonic.tts.ui.components.WavyLinearProgressIndicator
@@ -39,6 +46,8 @@ fun PlaybackScreen(
     exportCurrent: Int,
     exportTotal: Int,
     sleepTimerSecondsRemaining: Int,
+    currentSpeed: Float = 1.0f,
+    onSpeedChange: (Float) -> Unit = {},
     onBackClick: () -> Unit,
     onHomeClick: () -> Unit,
     onItemClick: (Int) -> Unit,
@@ -50,6 +59,7 @@ fun PlaybackScreen(
 ) {
     val listState = rememberLazyListState()
     val density = androidx.compose.ui.platform.LocalDensity.current
+    var showSpeedSheet by remember { mutableStateOf(false) }
 
     val bottomPadding by animateDpAsState(
         targetValue = if (isServiceActive || isPlaying) 210.dp else 140.dp,
@@ -89,6 +99,38 @@ fun PlaybackScreen(
                     }
                 },
                 actions = {
+                    val isSpeedHigh = currentSpeed > 1.5f
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isSpeedHigh) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isSpeedHigh) MaterialTheme.colorScheme.error.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                        ),
+                        modifier = Modifier
+                            .clickable { showSpeedSheet = true }
+                            .padding(end = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Speed,
+                                contentDescription = "Playback Speed",
+                                modifier = Modifier.size(16.dp),
+                                tint = if (isSpeedHigh) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = String.format(Locale.US, "%.2fx", currentSpeed),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSpeedHigh) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
                     IconButton(onClick = onHomeClick) {
                         Icon(imageVector = Icons.Default.Home, contentDescription = "Home")
                     }
@@ -144,13 +186,39 @@ fun PlaybackScreen(
                         Column {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
                                     text = "Progress",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                val isSpeedHigh = currentSpeed > 1.5f
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSpeedHigh) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                    modifier = Modifier.clickable { showSpeedSheet = true }
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Speed,
+                                            contentDescription = "Playback Speed",
+                                            modifier = Modifier.size(13.dp),
+                                            tint = if (isSpeedHigh) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(
+                                            text = String.format(Locale.US, "%.2fx", currentSpeed),
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSpeedHigh) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
                                 Text(
                                     text = "${currentIndex + 1} / ${sentences.size}",
                                     style = MaterialTheme.typography.labelSmall,
@@ -359,6 +427,171 @@ fun PlaybackScreen(
                                     Text("Cancel")
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            // Speed Adjustment Bottom Sheet
+            if (showSpeedSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { showSpeedSheet = false },
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp)
+                            .padding(bottom = 32.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Playback Speed",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            TextButton(onClick = { onSpeedChange(1.10f) }) {
+                                Text("Reset (1.10x)")
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Preset Chips
+                        val presets = listOf(0.8f, 1.0f, 1.10f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            presets.forEach { preset ->
+                                val isSelected = Math.abs(currentSpeed - preset) < 0.02f
+                                val isPresetHigh = preset > 1.5f
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { onSpeedChange(preset) },
+                                    label = {
+                                        Text(
+                                            text = String.format(Locale.US, "%.2fx", preset),
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = if (isPresetHigh) MaterialTheme.colorScheme.errorContainer else Color(0xFFE8F5E9),
+                                        selectedLabelColor = if (isPresetHigh) MaterialTheme.colorScheme.error else Color(0xFF2E7D32)
+                                    )
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        val isHighSpeed = currentSpeed > 1.5f
+                        val isDark = isSystemInDarkTheme()
+
+                        val targetContainerBg = if (isHighSpeed) {
+                            if (isDark) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+                            else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
+                        } else {
+                            if (isDark) Color(0xFF1B3B22).copy(alpha = 0.45f)
+                            else Color(0xFFE8F5E9).copy(alpha = 0.85f)
+                        }
+
+                        val targetBorderColor = if (isHighSpeed) {
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+                        } else {
+                            if (isDark) Color(0xFF81C784).copy(alpha = 0.4f)
+                            else Color(0xFF4CAF50).copy(alpha = 0.5f)
+                        }
+
+                        val targetAccentColor = if (isHighSpeed) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            if (isDark) Color(0xFF81C784)
+                            else Color(0xFF2E7D32)
+                        }
+
+                        val targetInactiveTrack = if (isHighSpeed) {
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.24f)
+                        } else {
+                            if (isDark) Color(0xFF2E7D32).copy(alpha = 0.3f)
+                            else Color(0xFFA5D6A7).copy(alpha = 0.6f)
+                        }
+
+                        val containerBg by animateColorAsState(targetValue = targetContainerBg, label = "sheet_speed_bg")
+                        val borderColor by animateColorAsState(targetValue = targetBorderColor, label = "sheet_speed_border")
+                        val accentColor by animateColorAsState(targetValue = targetAccentColor, label = "sheet_speed_accent")
+                        val inactiveTrackColor by animateColorAsState(targetValue = targetInactiveTrack, label = "sheet_speed_inactive_track")
+
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = containerBg,
+                            border = BorderStroke(1.dp, borderColor),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp), tint = accentColor)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Speed", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = accentColor.copy(alpha = 0.15f),
+                                            modifier = Modifier.padding(end = 6.dp)
+                                        ) {
+                                            Text(
+                                                text = if (isHighSpeed) "Fast (DSP)" else "Natural",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = accentColor,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                        Text(
+                                            text = String.format(Locale.US, "%.2fx", currentSpeed),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = accentColor
+                                        )
+                                    }
+                                }
+                                Slider(
+                                    value = currentSpeed,
+                                    onValueChange = onSpeedChange,
+                                    valueRange = 0.8f..2.5f,
+                                    steps = 33,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = accentColor,
+                                        activeTrackColor = accentColor,
+                                        inactiveTrackColor = inactiveTrackColor,
+                                        activeTickColor = Color.Transparent,
+                                        inactiveTickColor = Color.Transparent
+                                    )
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Button(
+                            onClick = { showSpeedSheet = false },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Done")
                         }
                     }
                 }

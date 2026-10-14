@@ -55,6 +55,7 @@ class MainViewModel : ViewModel() {
     var showCustomVoicesDialog = mutableStateOf(false)
     var preferredModelEngine = mutableStateOf("default") // "default", "v1", "v2", "v3"
     var pendingLangCode = ""
+    var pendingEngineCode = ""
 
     // Data
     val voiceFiles = mutableStateMapOf<String, String>()
