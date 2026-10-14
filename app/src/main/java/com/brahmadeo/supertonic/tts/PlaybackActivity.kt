@@ -165,17 +165,16 @@ class PlaybackActivity : ComponentActivity() {
                 playbackService?.setListener(playbackListenerStub)
                 isBound = true
 
-                val serviceSpeed = try { playbackService?.speed ?: -1f } catch (_: Exception) { -1f }
-                if (serviceSpeed > 0f) {
-                    currentSpeed = serviceSpeed
-                    currentSpeedState.floatValue = serviceSpeed
-                }
-
                 val isResumeExtra = intent.getBooleanExtra("is_resume", false)
                 val hasTextExtra = intent.hasExtra(EXTRA_TEXT)
                 val shouldResume = isResumeExtra || isRecreating || !hasTextExtra
                 
                 if (shouldResume) {
+                    val serviceSpeed = try { playbackService?.speed ?: -1f } catch (_: Exception) { -1f }
+                    if (serviceSpeed > 0f) {
+                        currentSpeed = serviceSpeed
+                        currentSpeedState.floatValue = serviceSpeed
+                    }
                     val serviceIndex = try { playbackService?.getCurrentIndex() ?: -1 } catch (_: Exception) { -1 }
                     if (serviceIndex != -1) {
                         currentIndexState.intValue = serviceIndex
@@ -460,6 +459,7 @@ class PlaybackActivity : ComponentActivity() {
         if (currentText.isEmpty()) return
         saveState()
         try {
+            playbackService?.speed = currentSpeed
             playbackService?.synthesizeAndPlay(currentText, currentLang, currentVoicePath, currentSpeed, currentSteps, 0)
         } catch (e: RemoteException) {
             e.printStackTrace()

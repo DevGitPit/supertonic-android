@@ -244,7 +244,7 @@ class SupertonicTextToSpeechService : TextToSpeechService() {
             }
         }
         val rawText = request.charSequenceText?.toString() ?: return
-        val effectiveSpeed = (request.speechRate / 100.0f).coerceIn(0.5f, 2.5f)
+        val effectiveSpeed = (request.speechRate / 100.0f).coerceIn(SupertonicTTS.MIN_SPEED, SupertonicTTS.MAX_NEURAL_SPEED)
         callback.start(SupertonicTTS.getAudioSampleRate(), android.media.AudioFormat.ENCODING_PCM_16BIT, 1)
         
         val requestedVoice = request.voiceName

@@ -359,6 +359,10 @@ class MainActivity : ComponentActivity() {
                                     onClick = {
                                         AssetManager.deleteVersion(this@MainActivity, "v1")
                                         viewModel.showV1DeleteDialog.value = false
+                                        if (viewModel.preferredModelEngine.value == "v1") {
+                                            viewModel.preferredModelEngine.value = "default"
+                                            saveStringPref("preferred_model_engine", "default")
+                                        }
                                         Toast.makeText(this@MainActivity, getString(R.string.v1_deleted_msg), Toast.LENGTH_SHORT).show()
                                     },
                                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
@@ -459,9 +463,13 @@ class MainActivity : ComponentActivity() {
                     }
 
                     if (viewModel.showDeleteVoiceConfirmDialog.value) {
-                        val voiceName = viewModel.selectedVoiceFile.value.removeSuffix(".json")
+                        val voiceFile = viewModel.pendingDeleteVoiceFile.value ?: viewModel.selectedVoiceFile.value
+                        val voiceName = voiceFile.removeSuffix(".json")
                         androidx.compose.material3.AlertDialog(
-                            onDismissRequest = { viewModel.showDeleteVoiceConfirmDialog.value = false },
+                            onDismissRequest = {
+                                viewModel.pendingDeleteVoiceFile.value = null
+                                viewModel.showDeleteVoiceConfirmDialog.value = false
+                            },
                             title = { Text(getString(R.string.delete_voice_title)) },
                             text = { Text(getString(R.string.delete_voice_message, voiceName)) },
                             confirmButton = {
@@ -474,7 +482,10 @@ class MainActivity : ComponentActivity() {
                                 ) { Text(getString(R.string.delete)) }
                             },
                             dismissButton = {
-                                TextButton(onClick = { viewModel.showDeleteVoiceConfirmDialog.value = false }) { Text(getString(R.string.cancel)) }
+                                TextButton(onClick = {
+                                    viewModel.pendingDeleteVoiceFile.value = null
+                                    viewModel.showDeleteVoiceConfirmDialog.value = false
+                                }) { Text(getString(R.string.cancel)) }
                             }
                         )
                     }
@@ -565,8 +576,7 @@ class MainActivity : ComponentActivity() {
                                                     )
                                                     IconButton(
                                                         onClick = {
-                                                            // We set the selected voice to this one so the deletion helper knows which file to delete
-                                                            viewModel.selectedVoiceFile.value = entry.value
+                                                            viewModel.pendingDeleteVoiceFile.value = entry.value
                                                             viewModel.showDeleteVoiceConfirmDialog.value = true
                                                         }
                                                     ) {
@@ -1095,6 +1105,15 @@ class MainActivity : ComponentActivity() {
                 
                 // Sanitize file name (replace illegal chars with underscore)
                 val sanitizedFileName = fileName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                val defaultVoiceFiles = setOf(
+                    "m1.json", "m2.json", "m3.json", "m4.json", "m5.json",
+                    "f1.json", "f2.json", "f3.json", "f4.json", "f5.json"
+                )
+                val finalFileName = if (defaultVoiceFiles.contains(sanitizedFileName.lowercase())) {
+                    "custom_$sanitizedFileName"
+                } else {
+                    sanitizedFileName
+                }
                 
                 // Save to active model version
                 val voiceDir = File(filesDir, "$currentModelVersion/voice_styles")
@@ -1102,7 +1121,7 @@ class MainActivity : ComponentActivity() {
                     voiceDir.mkdirs()
                 }
                 
-                val destFile = File(voiceDir, sanitizedFileName)
+                val destFile = File(voiceDir, finalFileName)
                 destFile.writeText(jsonString)
                 
                 withContext(Dispatchers.Main) {
@@ -1110,8 +1129,8 @@ class MainActivity : ComponentActivity() {
                     setupVoicesMap(currentModelVersion, viewModel.currentLang.value)
                     
                     // Select new voice
-                    viewModel.selectedVoiceFile.value = sanitizedFileName
-                    saveStringPref("selected_voice", sanitizedFileName)
+                    viewModel.selectedVoiceFile.value = finalFileName
+                    saveStringPref("selected_voice", finalFileName)
                     
                     // Reset playback service engine to reload style
                     val resetIntent = Intent(this@MainActivity, PlaybackService::class.java).apply {
@@ -1119,7 +1138,7 @@ class MainActivity : ComponentActivity() {
                     }
                     startService(resetIntent)
                     
-                    val friendlyName = sanitizedFileName.removeSuffix(".json")
+                    val friendlyName = finalFileName.removeSuffix(".json")
                     Toast.makeText(
                         this@MainActivity,
                         getString(R.string.import_voice_style_success, friendlyName),
@@ -1136,12 +1155,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun deleteVoiceStyle() {
-        val voiceFile = viewModel.selectedVoiceFile.value
-        val isDefault = voiceFile in listOf(
-            "M1.json", "M2.json", "M3.json", "M4.json", "M5.json",
-            "F1.json", "F2.json", "F3.json", "F4.json", "F5.json"
+        val voiceFile = viewModel.pendingDeleteVoiceFile.value ?: viewModel.selectedVoiceFile.value
+        viewModel.pendingDeleteVoiceFile.value = null
+        val defaultVoiceFiles = setOf(
+            "m1.json", "m2.json", "m3.json", "m4.json", "m5.json",
+            "f1.json", "f2.json", "f3.json", "f4.json", "f5.json"
         )
-        if (isDefault) return
+        if (defaultVoiceFiles.contains(voiceFile.lowercase())) return
 
         try {
             val file = File(filesDir, "$currentModelVersion/voice_styles/$voiceFile")
@@ -1151,19 +1171,21 @@ class MainActivity : ComponentActivity() {
             
             val friendlyName = voiceFile.removeSuffix(".json")
             
-            // Select default voice style
-            val defaultVoice = MainViewModel.DEFAULT_VOICE
-            viewModel.selectedVoiceFile.value = defaultVoice
-            saveStringPref("selected_voice", defaultVoice)
+            // If the deleted voice was the currently selected voice, fall back to default
+            if (viewModel.selectedVoiceFile.value == voiceFile) {
+                val defaultVoice = MainViewModel.DEFAULT_VOICE
+                viewModel.selectedVoiceFile.value = defaultVoice
+                saveStringPref("selected_voice", defaultVoice)
+                
+                // Reset playback service engine to reload style
+                val resetIntent = Intent(this, PlaybackService::class.java).apply {
+                    action = "RESET_ENGINE"
+                }
+                startService(resetIntent)
+            }
             
             // Refresh voices list
             setupVoicesMap(currentModelVersion, viewModel.currentLang.value)
-            
-            // Reset playback service engine to reload style
-            val resetIntent = Intent(this, PlaybackService::class.java).apply {
-                action = "RESET_ENGINE"
-            }
-            startService(resetIntent)
             
             Toast.makeText(
                 this,

@@ -118,12 +118,18 @@ impl ModelVersion {
             }
         }
 
-        let path_str = onnx_dir.as_ref().to_string_lossy().to_lowercase();
-        if path_str.contains("v2") {
+        let parent_name = onnx_dir
+            .as_ref()
+            .parent()
+            .and_then(|p| p.file_name())
+            .map(|n| n.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        if parent_name == "v2" {
             ModelVersion::V2
-        } else if path_str.contains("v1") {
+        } else if parent_name == "v1" {
             ModelVersion::V1
-        } else if path_str.contains("v3") {
+        } else if parent_name == "v3" {
             ModelVersion::V3
         } else if indexer.get(60).copied().unwrap_or(-1) == 27 {
             ModelVersion::V2
@@ -1154,6 +1160,27 @@ mod tests {
 
         // V1 never wraps tags
         assert_eq!(preprocess_text("hello", "en", ModelVersion::V1).unwrap(), "hello.");
+    }
+
+    #[test]
+    fn test_model_version_from_path() {
+        // Construct a mock indexer that has '<' (60) and '>' (62) to pass the initial tag check
+        let mut indexer = vec![0i64; 65];
+        indexer[60] = 100;
+        indexer[62] = 101;
+
+        // Parent dir "v2" -> V2
+        assert_eq!(ModelVersion::from_path_and_indexer("/app/files/v2/onnx", &indexer), ModelVersion::V2);
+        // Parent dir "v1" -> V1
+        assert_eq!(ModelVersion::from_path_and_indexer("/app/files/v1/onnx", &indexer), ModelVersion::V1);
+        // Parent dir "v3" -> V3
+        assert_eq!(ModelVersion::from_path_and_indexer("/app/files/v3/onnx", &indexer), ModelVersion::V3);
+        // Case-insensitive: "V3"
+        assert_eq!(ModelVersion::from_path_and_indexer("/app/files/V3/onnx", &indexer), ModelVersion::V3);
+
+        // Ancestor has "v1" or "v2", but parent directory is "v3" -> must resolve to V3
+        assert_eq!(ModelVersion::from_path_and_indexer("/data/v1/app/files/v3/onnx", &indexer), ModelVersion::V3);
+        assert_eq!(ModelVersion::from_path_and_indexer("/data/v2/app/files/v1/onnx", &indexer), ModelVersion::V1);
     }
 }
 

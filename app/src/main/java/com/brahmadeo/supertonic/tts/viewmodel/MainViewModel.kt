@@ -52,6 +52,7 @@ class MainViewModel : ViewModel() {
     var showV3ConfirmDialog = mutableStateOf(false)
     var showV3DeleteDialog = mutableStateOf(false)
     var showDeleteVoiceConfirmDialog = mutableStateOf(false)
+    var pendingDeleteVoiceFile = mutableStateOf<String?>(null)
     var showCustomVoicesDialog = mutableStateOf(false)
     var preferredModelEngine = mutableStateOf("default") // "default", "v1", "v2", "v3"
     var pendingLangCode = ""

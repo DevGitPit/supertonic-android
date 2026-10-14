@@ -268,7 +268,11 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         if (com.brahmadeo.supertonic.tts.utils.AssetManager.isVersionReady(this, modelVersion)) {
             val modelPath = File(filesDir, "$modelVersion/onnx").absolutePath
             val libPath = applicationInfo.nativeLibraryDir + "/libonnxruntime.so"
-            SupertonicTTS.initialize(modelPath, libPath)
+            serviceScope.launch(Dispatchers.IO) {
+                if (!SupertonicTTS.isInitialized(modelPath)) {
+                    SupertonicTTS.initialize(modelPath, libPath)
+                }
+            }
         }
     }
 
@@ -853,7 +857,8 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                         val sibilanceMode = prefs.getInt("sibilance_reduction_mode", 1)
                         val normalizedText = textNormalizer.normalize(sentence, lang, isAdvancedEnabled)
 
-                        val audioData = SupertonicTTS.generateAudio(normalizedText, lang, stylePath, speed, 0.0f, steps, VOLUME_BOOST_FACTOR, null, sibilanceMode)
+                        val exportSpeed = speed.coerceIn(SupertonicTTS.MIN_SPEED, SupertonicTTS.MAX_NEURAL_SPEED)
+                        val audioData = SupertonicTTS.generateAudio(normalizedText, lang, stylePath, exportSpeed, 0.0f, steps, VOLUME_BOOST_FACTOR, null, sibilanceMode)
                         if (audioData != null && audioData.isNotEmpty()) {
                             outputStream.write(audioData)
                         } else if (SupertonicTTS.isCancelled()) {

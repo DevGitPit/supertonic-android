@@ -44,7 +44,51 @@ class CheckDataActivity : Activity() {
         } else {
             // Multilingual models (v3)
             val v3Dir = File(filesDir, "v3/onnx")
-            val v3Langs = listOf("eng-USA", "kor-KOR", "spa-ESP", "por-PRT", "fra-FRA", "jpn-JPN", "deu-DEU")
+            val v3Langs = com.brahmadeo.supertonic.tts.utils.AssetManager.V3_LANGUAGES
+                .filter { it != "na" }
+                .map { lang ->
+                    when (lang) {
+                        "en" -> "eng-USA"
+                        "ko" -> "kor-KOR"
+                        "ja" -> "jpn-JPN"
+                        "ar" -> "ara-SAU"
+                        "bg" -> "bul-BGR"
+                        "cs" -> "ces-CZE"
+                        "da" -> "dan-DNK"
+                        "de" -> "deu-DEU"
+                        "el" -> "ell-GRC"
+                        "es" -> "spa-ESP"
+                        "et" -> "est-EST"
+                        "fi" -> "fin-FIN"
+                        "fr" -> "fra-FRA"
+                        "hi" -> "hin-IND"
+                        "hr" -> "hrv-HRV"
+                        "hu" -> "hun-HUN"
+                        "id" -> "ind-IDN"
+                        "it" -> "ita-ITA"
+                        "lt" -> "lit-LTU"
+                        "lv" -> "lav-LVA"
+                        "nl" -> "nld-NLD"
+                        "pl" -> "pol-POL"
+                        "pt" -> "por-PRT"
+                        "ro" -> "ron-ROU"
+                        "ru" -> "rus-RUS"
+                        "sk" -> "slk-SVK"
+                        "sl" -> "slv-SVN"
+                        "sv" -> "swe-SWE"
+                        "tr" -> "tur-TUR"
+                        "uk" -> "ukr-UKR"
+                        "vi" -> "vie-VNM"
+                        else -> {
+                            try {
+                                val loc = java.util.Locale.forLanguageTag(lang)
+                                "${loc.isO3Language}-${loc.isO3Language.uppercase()}"
+                            } catch (_: Exception) {
+                                "$lang-$lang"
+                            }
+                        }
+                    }
+                }
             if (v3Dir.exists()) {
                 availableVoices.addAll(v3Langs)
             } else {
