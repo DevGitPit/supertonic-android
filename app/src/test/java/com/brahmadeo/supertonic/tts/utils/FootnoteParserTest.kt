@@ -10,59 +10,14 @@ import java.util.regex.Pattern
 
 class FootnoteParserTest {
 
-    private val SENTENCE_SPLIT_PATTERN = Pattern.compile("([.!?]['\"”)}\\]]?(?:\\u2060FN\\d+\\u2060)*)\\s+")
-    private val FN_MARK = "\u2060FN%d\u2060"
-    private val FN_MARK_REGEX = Regex("\u2060FN(\\d+)\u2060")
-
-    private fun splitParagraphIntoSentences(text: String): List<String> {
-        val matcher = SENTENCE_SPLIT_PATTERN.matcher(text)
-        val sentences = mutableListOf<String>()
-        var last = 0
-        while (matcher.find()) {
-            val s = text.substring(last, matcher.end()).trim()
-            if (s.isNotEmpty()) {
-                sentences.add(s)
-            }
-            last = matcher.end()
-        }
-        if (last < text.length) {
-            val s = text.substring(last).trim()
-            if (s.isNotEmpty()) {
-                sentences.add(s)
-            }
-        }
-        return if (sentences.isEmpty()) listOf(text) else sentences
-    }
-
     private fun weaveSentences(
         para: String,
         notesMap: Map<Int, String>,
         isOff: Boolean = false
     ): List<String> {
-        val out = mutableListOf<String>()
-        val sentences = splitParagraphIntoSentences(para)
-        for (sentence in sentences) {
-            val matches = FN_MARK_REGEX.findAll(sentence).toList()
-            if (matches.isEmpty()) {
-                out.add(sentence)
-            } else {
-                val ids = matches.map { it.groupValues[1].toInt() }
-                val cleanSentence = FN_MARK_REGEX.replace(sentence, "")
-                    .replace(Regex("\\s+([.,;:!?])"), "$1")
-                    .trim()
-                if (cleanSentence.isNotBlank()) {
-                    out.add(cleanSentence)
-                }
-                if (!isOff) {
-                    for (id in ids) {
-                        notesMap[id]?.let { note ->
-                            out.add("Footnote: $note")
-                        }
-                    }
-                }
-            }
-        }
-        return out
+        val mode = if (isOff) EbookParser.FootnoteMode.OFF else EbookParser.FootnoteMode.ALL
+        val result = EbookParser.weaveFootnotesIntoParagraphs(para, notesMap, mode)
+        return result.split("\n\n").filter { it.isNotBlank() }
     }
 
     @Test
@@ -202,23 +157,14 @@ class FootnoteParserTest {
 
         val doc = Jsoup.parse(notesHtml)
         val el = doc.getElementById("notes-ch1-1")!!
-        val copy = el.clone()
 
-        // Apply NoteResolver cleaning logic
-        copy.select("a[href*=#], a[epub\\:type~=backlink], a[role=doc-backlink], [class*=backlink], [class*=return]").forEach { a ->
-            val aText = a.text().trim()
-            if (aText.length <= 4 || aText.matches(Regex("[↩↑^]|.*(?:back|return).*|^\\[?\\d+\\]?$|back to note.*", RegexOption.IGNORE_CASE))) {
-                a.remove()
-            }
-        }
-        copy.select("sup, .fn-number, .footnote-number, .label, .fnanchor, .noteref").remove()
-        var noteText = copy.text().trim()
-        noteText = noteText.replaceFirst(Regex("^(?:(?:\\[?\\d+\\]?|\\(\\d+\\)|[\\p{L}\\d]+)[.:)]|Footnote:?)\\s*"), "").trim()
+        // Call production cleaning method directly
+        val noteText = EbookParser.cleanFootnoteElement(el)
 
         assertEquals(
             "The main source for this account of Socrates’s trial is, of course, Plato’s Apology, although I have also drawn upon material from Xenophon’s Apology and other sources.",
             noteText
         )
-        assertFalse(EbookParser.isCitationOnly(noteText))
+        assertFalse(EbookParser.isCitationOnly(noteText!!))
     }
 }

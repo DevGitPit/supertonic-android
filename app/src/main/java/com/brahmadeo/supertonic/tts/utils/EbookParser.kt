@@ -158,6 +158,75 @@ class EbookParser(private val context: Context) {
             }
             return if (sentences.isEmpty()) listOf(text) else sentences
         }
+
+        val sharedConsumedTargets = HashMap<String, MutableSet<String>>()
+
+        fun cleanFootnoteElement(el: Element): String? {
+            val copy = el.clone()
+
+            // Remove backlinks
+            copy.select("a[href*=#], a[epub\\:type~=backlink], a[role=doc-backlink], [class*=backlink], [class*=return]").forEach { a ->
+                val aText = a.text().trim()
+                if (aText.length <= 4 || aText.matches(Regex("[↩↑^]|.*(?:back|return).*|^\\[?\\d+\\]?$|back to note.*", RegexOption.IGNORE_CASE))) {
+                    a.remove()
+                }
+            }
+
+            // Remove footnote labels / sups
+            copy.select("sup, .fn-number, .footnote-number, .label, .fnanchor, .noteref").remove()
+
+            var noteText = copy.text().trim()
+            noteText = noteText.replaceFirst(Regex("^(?:(?:\\[?\\d+\\]?|\\(\\d+\\)|[\\p{L}\\d]+)[.:)]|Footnote:?)\\s*"), "").trim()
+
+            return noteText.ifBlank { null }
+        }
+
+        fun weaveFootnotesIntoParagraphs(
+            rawText: String,
+            notesMap: Map<Int, String>,
+            mode: FootnoteMode
+        ): String {
+            val paragraphs = rawText.split("\n")
+                .map { it.trim().replace(Regex("\\s+"), " ") }
+                .filter { it.isNotBlank() }
+
+            val outBlocks = mutableListOf<String>()
+
+            for (para in paragraphs) {
+                if (!para.contains("\u2060FN")) {
+                    outBlocks.add(para)
+                    continue
+                }
+
+                val sentences = splitParagraphIntoSentences(para)
+                for (sentence in sentences) {
+                    val matches = FN_MARK_REGEX.findAll(sentence).toList()
+                    if (matches.isEmpty()) {
+                        outBlocks.add(sentence)
+                    } else {
+                        val ids = matches.map { it.groupValues[1].toInt() }
+                        val cleanSentence = FN_MARK_REGEX.replace(sentence, "")
+                            .replace(Regex("\\s+([.,;:!?])"), "$1")
+                            .trim()
+
+                        if (cleanSentence.isNotBlank()) {
+                            outBlocks.add(cleanSentence)
+                        }
+
+                        if (mode != FootnoteMode.OFF) {
+                            for (id in ids) {
+                                val note = notesMap[id]
+                                if (!note.isNullOrBlank()) {
+                                    outBlocks.add("Footnote: $note")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return outBlocks.joinToString("\n\n").trim()
+        }
     }
 
     enum class FootnoteMode {
@@ -177,8 +246,8 @@ class EbookParser(private val context: Context) {
     }
 
     class NoteResolver(
-        private val publication: Publication,
-        private val footnoteMode: FootnoteMode
+        val publication: Publication,
+        val footnoteMode: FootnoteMode
     ) {
         private val docCache = HashMap<String, Document?>()
         val consumedTargetsByFile = HashMap<String, MutableSet<String>>()
@@ -222,24 +291,9 @@ class EbookParser(private val context: Context) {
 
             val cleanFile = getRelativePath(resolvedFile)
             consumedTargetsByFile.getOrPut(cleanFile) { mutableSetOf() }.add(targetId)
+            sharedConsumedTargets.getOrPut(cleanFile) { mutableSetOf() }.add(targetId)
 
-            val copy = el.clone()
-
-            // Remove backlinks
-            copy.select("a[href*=#], a[epub\\:type~=backlink], a[role=doc-backlink], [class*=backlink], [class*=return]").forEach { a ->
-                val aText = a.text().trim()
-                if (aText.length <= 4 || aText.matches(Regex("[↩↑^]|.*(?:back|return).*|^\\[?\\d+\\]?$|back to note.*", RegexOption.IGNORE_CASE))) {
-                    a.remove()
-                }
-            }
-
-            // Remove footnote labels / sups
-            copy.select("sup, .fn-number, .footnote-number, .label, .fnanchor, .noteref").remove()
-
-            var noteText = copy.text().trim()
-            noteText = noteText.replaceFirst(Regex("^(?:(?:\\[?\\d+\\]?|\\(\\d+\\)|[\\p{L}\\d]+)[.:)]|Footnote:?)\\s*"), "").trim()
-
-            if (noteText.isBlank()) return null
+            val noteText = cleanFootnoteElement(el) ?: return null
 
             if (footnoteMode == FootnoteMode.FILTER_CITATIONS && isCitationOnly(noteText)) {
                 return null
@@ -251,7 +305,7 @@ class EbookParser(private val context: Context) {
 
     private fun getOrCreateNoteResolver(publication: Publication, mode: FootnoteMode): NoteResolver {
         var resolver = noteResolverInstance
-        if (resolver == null) {
+        if (resolver == null || resolver.publication != publication || resolver.footnoteMode != mode) {
             resolver = NoteResolver(publication, mode)
             noteResolverInstance = resolver
         }
@@ -293,7 +347,9 @@ class EbookParser(private val context: Context) {
         }
 
         val totalNotes = doc.select("li[id], aside[id], div[class*=footnote], p[class*=footnote], [epub\\:type~=footnote], [role=doc-footnote]").size
-        val consumed = noteResolverInstance?.consumedTargetsByFile?.get(cleanPath)?.size ?: 0
+        val consumedFromInstance = noteResolverInstance?.consumedTargetsByFile?.get(cleanPath)?.size ?: 0
+        val consumedFromShared = sharedConsumedTargets[cleanPath]?.size ?: 0
+        val consumed = maxOf(consumedFromInstance, consumedFromShared)
 
         return totalNotes >= 3 && consumed >= (totalNotes * 0.5)
     }
@@ -411,64 +467,25 @@ class EbookParser(private val context: Context) {
                 val noteText = resolver.resolve(chapterPath, href)
                 if (noteText != null) {
                     notesMap[index] = noteText
-                    val (targetFile, targetId) = resolveHref(chapterPath, href)
-                    if (pathsMatch(targetFile, chapterPath) && targetId.isNotEmpty()) {
-                        val targetEl = document.getElementById(targetId) ?: document.selectFirst("[name=$targetId]")
-                        if (targetEl != null) {
-                            localTargetsToRemove.add(targetEl.closest("aside, li, p, div, section") ?: targetEl)
-                        }
-                    }
+                }
+            }
+
+            // Collect local note target containers to remove from DOM
+            val (targetFile, targetId) = resolveHref(chapterPath, href)
+            if (pathsMatch(targetFile, chapterPath) && targetId.isNotEmpty()) {
+                val targetEl = document.getElementById(targetId) ?: document.selectFirst("[name=$targetId]")
+                val noteContainer = targetEl?.closest("aside, li, dd, [epub\\:type~=footnote], [role=doc-footnote]")
+                if (noteContainer != null) {
+                    localTargetsToRemove.add(noteContainer)
                 }
             }
             markerEl.replaceWith(TextNode(FN_MARK.format(index)))
         }
 
-        if (notesMap.isNotEmpty()) {
-            localTargetsToRemove.forEach { it.remove() }
-            document.select("aside[epub\\:type~=footnote], aside[role=doc-footnote], section[class*=footnotes], div[class*=footnotes], ol[class*=footnotes]").remove()
-        }
+        localTargetsToRemove.forEach { it.remove() }
 
         val rawText = extractRawTextBetween(document, startElement, endElement)
-        val paragraphs = rawText.split("\n")
-            .map { it.trim().replace(Regex("\\s+"), " ") }
-            .filter { it.isNotBlank() }
-
-        val outBlocks = mutableListOf<String>()
-
-        for (para in paragraphs) {
-            if (!para.contains("\u2060FN")) {
-                outBlocks.add(para)
-                continue
-            }
-
-            val sentences = splitParagraphIntoSentences(para)
-            for (sentence in sentences) {
-                val matches = FN_MARK_REGEX.findAll(sentence).toList()
-                if (matches.isEmpty()) {
-                    outBlocks.add(sentence)
-                } else {
-                    val ids = matches.map { it.groupValues[1].toInt() }
-                    val cleanSentence = FN_MARK_REGEX.replace(sentence, "")
-                        .replace(Regex("\\s+([.,;:!?])"), "$1")
-                        .trim()
-                    
-                    if (cleanSentence.isNotBlank()) {
-                        outBlocks.add(cleanSentence)
-                    }
-
-                    if (mode != FootnoteMode.OFF) {
-                        for (id in ids) {
-                            val note = notesMap[id]
-                            if (!note.isNullOrBlank()) {
-                                outBlocks.add("Footnote: $note")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return outBlocks.joinToString("\n\n").trim()
+        return weaveFootnotesIntoParagraphs(rawText, notesMap, mode)
     }
 
     private fun resolveHref(chapterPath: String, href: String): Pair<String, String> {
