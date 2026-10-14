@@ -304,12 +304,11 @@ class EbookParser(private val context: Context) {
     }
 
     private fun getOrCreateNoteResolver(publication: Publication, mode: FootnoteMode): NoteResolver {
-        var resolver = noteResolverInstance
-        if (resolver == null || resolver.publication != publication || resolver.footnoteMode != mode) {
-            resolver = NoteResolver(publication, mode)
-            noteResolverInstance = resolver
+        val existing = noteResolverInstance
+        if (existing != null && existing.publication === publication && existing.footnoteMode == mode) {
+            return existing
         }
-        return resolver
+        return NoteResolver(publication, mode).also { noteResolverInstance = it }
     }
 
     suspend fun shouldSkipNotesChapter(publication: Publication, link: Link): Boolean {
@@ -474,8 +473,8 @@ class EbookParser(private val context: Context) {
             val (targetFile, targetId) = resolveHref(chapterPath, href)
             if (pathsMatch(targetFile, chapterPath) && targetId.isNotEmpty()) {
                 val targetEl = document.getElementById(targetId) ?: document.selectFirst("[name=$targetId]")
-                val noteContainer = targetEl?.closest("aside, li, dd, [epub\\:type~=footnote], [role=doc-footnote]")
-                if (noteContainer != null) {
+                if (targetEl != null) {
+                    val noteContainer = targetEl.closest("aside, li, dd, [epub\\:type~=footnote], [role=doc-footnote]") ?: targetEl
                     localTargetsToRemove.add(noteContainer)
                 }
             }
