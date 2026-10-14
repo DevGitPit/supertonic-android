@@ -327,6 +327,7 @@ class MainActivity : ComponentActivity() {
                     if (viewModel.showV2ConfirmDialog.value) {
                         androidx.compose.material3.AlertDialog(
                              onDismissRequest = { 
+                                 viewModel.pendingEngineCode = ""
                                  viewModel.showV2ConfirmDialog.value = false
                              },
                             title = { Text(getString(R.string.v2_download_title)) },
