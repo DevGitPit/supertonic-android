@@ -115,10 +115,11 @@ fun MainScreen(
             "F1.json", "F2.json", "F3.json", "F4.json", "F5.json"
         )
     }
-    val sortedVoiceNames = remember(voices) {
-        voices.keys.toList().sortedWith { name1, name2 ->
-            val file1 = voices[name1] ?: ""
-            val file2 = voices[name2] ?: ""
+    val voiceEntries = voices.toMap()
+    val sortedVoiceNames = remember(voiceEntries) {
+        voiceEntries.keys.toList().sortedWith { name1, name2 ->
+            val file1 = voiceEntries[name1] ?: ""
+            val file2 = voiceEntries[name2] ?: ""
             val isCustom1 = file1 !in defaultVoiceFiles
             val isCustom2 = file2 !in defaultVoiceFiles
             when {

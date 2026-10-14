@@ -99,4 +99,33 @@ class PlaybackSpeedTest {
         assertTrue(presets.contains(defaultSpeed))
         assertEquals(1.10f, defaultSpeed, 0.0001f)
     }
+
+    @Test
+    fun testPlaybackSpeedClampingWithNaN() {
+        // Assert that Float.NaN returns the default finite fallback before coerceIn
+        assertEquals(PlaybackSpeedUtils.DEFAULT_PLAYBACK_SPEED, PlaybackSpeedUtils.clampPlaybackSpeed(Float.NaN), 0.001f)
+        // Assert that Float.NaN returns an explicit fallback before coerceIn
+        assertEquals(1.5f, PlaybackSpeedUtils.clampPlaybackSpeed(Float.NaN, 1.5f), 0.001f)
+        assertEquals(1.0f, PlaybackSpeedUtils.clampPlaybackSpeed(Float.NaN, 1.0f), 0.001f)
+    }
+
+    @Test
+    fun testStartupRestorationValidationAndClamping() {
+        // Startup restoration path: validate NaN before clamping persisted speed
+        val restoreSpeed = { persistedSpeed: Float, fallback: Float ->
+            val validated = if (persistedSpeed.isNaN()) fallback else persistedSpeed
+            PlaybackSpeedUtils.clampPlaybackSpeed(validated)
+        }
+
+        // When persisted speed is NaN, it should resolve to finite fallback
+        assertEquals(1.1f, restoreSpeed(Float.NaN, 1.1f), 0.001f)
+        assertEquals(PlaybackSpeedUtils.DEFAULT_PLAYBACK_SPEED, restoreSpeed(Float.NaN, PlaybackSpeedUtils.DEFAULT_PLAYBACK_SPEED), 0.001f)
+
+        // When persisted speed is out of bounds, it should clamp to safe bounds
+        assertEquals(PlaybackSpeedUtils.MAX_PLAYBACK_SPEED, restoreSpeed(5.0f, 1.1f), 0.001f)
+        assertEquals(PlaybackSpeedUtils.MIN_PLAYBACK_SPEED, restoreSpeed(-2.0f, 1.1f), 0.001f)
+
+        // Valid persisted speed is retained
+        assertEquals(1.25f, restoreSpeed(1.25f, 1.1f), 0.001f)
+    }
 }

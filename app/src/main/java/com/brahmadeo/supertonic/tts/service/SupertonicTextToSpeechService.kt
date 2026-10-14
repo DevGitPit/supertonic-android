@@ -73,7 +73,9 @@ class SupertonicTextToSpeechService : TextToSpeechService() {
 
     override fun onIsLanguageAvailable(lang: String?, country: String?, variant: String?): Int {
         val language = normalizeLanguage(lang)
-        val modelVersion = getCurrentModelVersion()
+        val prefs = attributionContext.getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+        val preferredEngine = prefs.getString("preferred_model_engine", "default") ?: "default"
+        val modelVersion = AssetManager.resolveModelVersion(preferredEngine, language)
         
         if (AssetManager.isLanguageSupported(modelVersion, language)) {
             val modelDir = File(filesDir, "$modelVersion/onnx")

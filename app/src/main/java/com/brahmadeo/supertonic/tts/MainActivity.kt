@@ -334,7 +334,7 @@ class MainActivity : ComponentActivity() {
                             confirmButton = {
                                 TextButton(onClick = {
                                     val lang = viewModel.pendingLangCode
-                                    val engine = viewModel.pendingEngineCode.ifEmpty { "v2" }
+                                    val engine = viewModel.pendingEngineCode.ifEmpty { viewModel.preferredModelEngine.value }
                                     viewModel.pendingEngineCode = ""
                                     viewModel.showV2ConfirmDialog.value = false
                                     applyPreferredModelEngine(engine, "v2", lang)
@@ -388,10 +388,15 @@ class MainActivity : ComponentActivity() {
                                             viewModel.preferredModelEngine.value = "default"
                                             saveStringPref("preferred_model_engine", "default")
                                         }
-                                        // Ensure we are on English/V1
-                                        viewModel.currentLang.value = "en"
-                                        saveStringPref("selected_lang", "en")
-                                        switchModel("v1")
+                                        val resolved = resolveModelVersion(viewModel.currentLang.value)
+                                        if (resolved == "v3" && AssetManager.isV3Ready(this@MainActivity)) {
+                                            switchModel("v3")
+                                        } else {
+                                            // Ensure we are on English/V1
+                                            viewModel.currentLang.value = "en"
+                                            saveStringPref("selected_lang", "en")
+                                            switchModel("v1")
+                                        }
                                         val resetIntent = Intent(this@MainActivity, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
                                         startService(resetIntent)
                                         Toast.makeText(this@MainActivity, getString(R.string.v2_deleted_msg), Toast.LENGTH_SHORT).show()
@@ -416,7 +421,7 @@ class MainActivity : ComponentActivity() {
                             confirmButton = {
                                 TextButton(onClick = {
                                     val lang = viewModel.pendingLangCode
-                                    val engine = viewModel.pendingEngineCode.ifEmpty { "v3" }
+                                    val engine = viewModel.pendingEngineCode.ifEmpty { viewModel.preferredModelEngine.value }
                                     viewModel.pendingEngineCode = ""
                                     viewModel.showV3ConfirmDialog.value = false
                                     applyPreferredModelEngine(engine, "v3", lang)
@@ -445,10 +450,15 @@ class MainActivity : ComponentActivity() {
                                             viewModel.preferredModelEngine.value = "default"
                                             saveStringPref("preferred_model_engine", "default")
                                         }
-                                        // Ensure we are on English/V1
-                                        viewModel.currentLang.value = "en"
-                                        saveStringPref("selected_lang", "en")
-                                        switchModel("v1")
+                                        val resolved = resolveModelVersion(viewModel.currentLang.value)
+                                        if (resolved == "v2" && AssetManager.isV2Ready(this@MainActivity)) {
+                                            switchModel("v2")
+                                        } else {
+                                            // Ensure we are on English/V1
+                                            viewModel.currentLang.value = "en"
+                                            saveStringPref("selected_lang", "en")
+                                            switchModel("v1")
+                                        }
                                         val resetIntent = Intent(this@MainActivity, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
                                         startService(resetIntent)
                                         Toast.makeText(this@MainActivity, getString(R.string.v3_deleted_msg), Toast.LENGTH_SHORT).show()
@@ -818,7 +828,9 @@ class MainActivity : ComponentActivity() {
         viewModel.selectedVoiceFile2.value = prefs.getString("selected_voice_2", MainViewModel.DEFAULT_VOICE_2) ?: MainViewModel.DEFAULT_VOICE_2
         viewModel.isMixingEnabled.value = prefs.getBoolean("is_mixing_enabled", false)
         viewModel.mixAlpha.floatValue = prefs.getFloat("mix_alpha", 0.5f)
-        viewModel.currentSpeed.floatValue = prefs.getFloat("speed", MainViewModel.DEFAULT_SPEED)
+        val rawSpeed = prefs.getFloat("speed", MainViewModel.DEFAULT_SPEED)
+        val validatedSpeed = if (rawSpeed.isNaN()) MainViewModel.DEFAULT_SPEED else rawSpeed
+        viewModel.currentSpeed.floatValue = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.clampPlaybackSpeed(validatedSpeed)
         viewModel.currentSteps.intValue = prefs.getInt("diffusion_steps", MainViewModel.DEFAULT_STEPS)
         viewModel.isAdvancedNormalizationEnabled.value = prefs.getBoolean("is_advanced_normalization", false)
         val sMode = prefs.getInt("sibilance_reduction_mode", 1)
@@ -1115,23 +1127,31 @@ class MainActivity : ComponentActivity() {
                     "custom_voice_${System.currentTimeMillis()}.json"
                 }
                 
-                val defaultVoiceFiles = setOf(
-                    "m1.json", "m2.json", "m3.json", "m4.json", "m5.json",
-                    "f1.json", "f2.json", "f3.json", "f4.json", "f5.json"
-                )
-                val finalFileName = if (defaultVoiceFiles.contains(fileName.lowercase())) {
-                    "custom_$fileName"
-                } else {
-                    fileName
-                }
-                
                 // Save to active model version
                 val voiceDir = File(filesDir, "$currentModelVersion/voice_styles")
                 if (!voiceDir.exists()) {
                     voiceDir.mkdirs()
                 }
-                
-                val destFile = File(voiceDir, finalFileName)
+
+                val defaultVoiceFiles = setOf(
+                    "m1.json", "m2.json", "m3.json", "m4.json", "m5.json",
+                    "f1.json", "f2.json", "f3.json", "f4.json", "f5.json"
+                )
+                var candidateFileName = if (defaultVoiceFiles.contains(fileName.lowercase())) {
+                    "custom_$fileName"
+                } else {
+                    fileName
+                }
+
+                val baseName = candidateFileName.removeSuffix(".json")
+                var counter = 1
+                var destFile = File(voiceDir, candidateFileName)
+                while (destFile.exists()) {
+                    candidateFileName = "${baseName}_$counter.json"
+                    destFile = File(voiceDir, candidateFileName)
+                    counter++
+                }
+                val finalFileName = candidateFileName
                 destFile.writeText(jsonString)
                 
                 withContext(Dispatchers.Main) {

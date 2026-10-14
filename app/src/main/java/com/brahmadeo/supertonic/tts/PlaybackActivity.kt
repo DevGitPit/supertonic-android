@@ -285,7 +285,9 @@ class PlaybackActivity : ComponentActivity() {
             val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
             currentText = prefs.getString("last_text", "") ?: ""
             currentVoicePath = prefs.getString("last_voice_path", "") ?: ""
-            currentSpeed = prefs.getFloat("last_speed", 1.10f)
+            val rawSpeed = prefs.getFloat("last_speed", 1.10f)
+            val validatedSpeed = if (rawSpeed.isNaN()) 1.10f else rawSpeed
+            currentSpeed = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.clampPlaybackSpeed(validatedSpeed)
             currentSpeedState.floatValue = currentSpeed
             currentSteps = prefs.getInt("last_steps", 5)
             currentLang = prefs.getString("last_lang", "en") ?: "en"
@@ -322,7 +324,9 @@ class PlaybackActivity : ComponentActivity() {
         if (newText.isNotEmpty() && newText != currentText) {
             currentText = newText
             currentVoicePath = prefs.getString("last_voice_path", "") ?: ""
-            currentSpeed = prefs.getFloat("last_speed", 1.10f)
+            val rawSpeed = prefs.getFloat("last_speed", 1.10f)
+            val validatedSpeed = if (rawSpeed.isNaN()) 1.10f else rawSpeed
+            currentSpeed = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.clampPlaybackSpeed(validatedSpeed)
             currentSpeedState.floatValue = currentSpeed
             currentSteps = prefs.getInt("last_steps", 5)
             currentLang = prefs.getString("last_lang", "en") ?: "en"

@@ -4,7 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
-import java.io.File
+import com.brahmadeo.supertonic.tts.utils.AssetManager
 import java.util.ArrayList
 
 /**
@@ -19,32 +19,29 @@ class CheckDataActivity : Activity() {
         val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
         val savedLang = prefs.getString("selected_lang", "en") ?: "en"
         val preferredEngine = prefs.getString("preferred_model_engine", "default") ?: "default"
-        val modelVersion = com.brahmadeo.supertonic.tts.utils.AssetManager.resolveModelVersion(preferredEngine, savedLang)
+        val modelVersion = AssetManager.resolveModelVersion(preferredEngine, savedLang)
 
         val availableVoices = ArrayList<String>()
         val unavailableVoices = ArrayList<String>()
 
         if (modelVersion == "v1") {
             // English (v1)
-            val v1Dir = File(filesDir, "v1/onnx")
-            if (v1Dir.exists()) {
+            if (AssetManager.isVersionReady(this, "v1")) {
                 availableVoices.add("eng-USA")
             } else {
                 unavailableVoices.add("eng-USA")
             }
         } else if (modelVersion == "v2") {
             // Multilingual models (v2)
-            val v2Dir = File(filesDir, "v2/onnx")
             val v2Langs = listOf("eng-USA", "kor-KOR", "spa-ESP", "por-PRT", "fra-FRA")
-            if (v2Dir.exists()) {
+            if (AssetManager.isVersionReady(this, "v2")) {
                 availableVoices.addAll(v2Langs)
             } else {
                 unavailableVoices.addAll(v2Langs)
             }
         } else {
             // Multilingual models (v3)
-            val v3Dir = File(filesDir, "v3/onnx")
-            val v3Langs = com.brahmadeo.supertonic.tts.utils.AssetManager.V3_LANGUAGES
+            val v3Langs = AssetManager.V3_LANGUAGES
                 .filter { it != "na" }
                 .map { lang ->
                     when (lang) {
@@ -89,7 +86,7 @@ class CheckDataActivity : Activity() {
                         }
                     }
                 }
-            if (v3Dir.exists()) {
+            if (AssetManager.isVersionReady(this, "v3")) {
                 availableVoices.addAll(v3Langs)
             } else {
                 unavailableVoices.addAll(v3Langs)

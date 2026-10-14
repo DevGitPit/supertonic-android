@@ -261,7 +261,9 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         }
 
         val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
-        playbackSpeed = prefs.getFloat("last_speed", prefs.getFloat("speed", 1.1f))
+        val rawSpeed = prefs.getFloat("last_speed", prefs.getFloat("speed", 1.1f))
+        val validatedSpeed = if (rawSpeed.isNaN()) 1.1f else rawSpeed
+        playbackSpeed = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.clampPlaybackSpeed(validatedSpeed)
         val savedLang = prefs.getString("selected_lang", "en") ?: "en"
         val preferredEngine = prefs.getString("preferred_model_engine", "default") ?: "default"
         val modelVersion = com.brahmadeo.supertonic.tts.utils.AssetManager.resolveModelVersion(preferredEngine, savedLang)
