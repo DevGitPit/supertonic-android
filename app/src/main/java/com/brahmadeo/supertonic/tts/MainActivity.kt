@@ -382,16 +382,22 @@ class MainActivity : ComponentActivity() {
                             confirmButton = {
                                 TextButton(
                                     onClick = {
+                                        val resolved = resolveModelVersion(viewModel.currentLang.value)
+                                        val canRetainV3 = resolved == "v3" && AssetManager.isV3Ready(this@MainActivity)
+                                        if (!canRetainV3 && !AssetManager.isV1Ready(this@MainActivity)) {
+                                            viewModel.showV2DeleteDialog.value = false
+                                            Toast.makeText(this@MainActivity, "Cannot delete: Model v1 is not ready", Toast.LENGTH_SHORT).show()
+                                            return@TextButton
+                                        }
                                         AssetManager.deleteVersion(this@MainActivity, "v2")
                                         viewModel.showV2DeleteDialog.value = false
                                         if (viewModel.preferredModelEngine.value == "v2") {
                                             viewModel.preferredModelEngine.value = "default"
                                             saveStringPref("preferred_model_engine", "default")
                                         }
-                                        val resolved = resolveModelVersion(viewModel.currentLang.value)
-                                        if (resolved == "v3" && AssetManager.isV3Ready(this@MainActivity)) {
+                                        if (canRetainV3) {
                                             switchModel("v3")
-                                        } else {
+                                        } else if (AssetManager.isV1Ready(this@MainActivity)) {
                                             // Ensure we are on English/V1
                                             viewModel.currentLang.value = "en"
                                             saveStringPref("selected_lang", "en")
@@ -444,16 +450,22 @@ class MainActivity : ComponentActivity() {
                             confirmButton = {
                                 TextButton(
                                     onClick = {
+                                        val resolved = resolveModelVersion(viewModel.currentLang.value)
+                                        val canRetainV2 = resolved == "v2" && AssetManager.isV2Ready(this@MainActivity)
+                                        if (!canRetainV2 && !AssetManager.isV1Ready(this@MainActivity)) {
+                                            viewModel.showV3DeleteDialog.value = false
+                                            Toast.makeText(this@MainActivity, "Cannot delete: Model v1 is not ready", Toast.LENGTH_SHORT).show()
+                                            return@TextButton
+                                        }
                                         AssetManager.deleteVersion(this@MainActivity, "v3")
                                         viewModel.showV3DeleteDialog.value = false
                                         if (viewModel.preferredModelEngine.value == "v3") {
                                             viewModel.preferredModelEngine.value = "default"
                                             saveStringPref("preferred_model_engine", "default")
                                         }
-                                        val resolved = resolveModelVersion(viewModel.currentLang.value)
-                                        if (resolved == "v2" && AssetManager.isV2Ready(this@MainActivity)) {
+                                        if (canRetainV2) {
                                             switchModel("v2")
-                                        } else {
+                                        } else if (AssetManager.isV1Ready(this@MainActivity)) {
                                             // Ensure we are on English/V1
                                             viewModel.currentLang.value = "en"
                                             saveStringPref("selected_lang", "en")
@@ -775,8 +787,8 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         canDeleteV1 = AssetManager.isV1Ready(this) && (AssetManager.isV2Ready(this) || AssetManager.isV3Ready(this)) && currentModelVersion != "v1",
-                        isV2Ready = AssetManager.isV2Ready(this),
-                        isV3Ready = AssetManager.isV3Ready(this),
+                        isV2Ready = AssetManager.isV2Ready(this) && (AssetManager.isV1Ready(this) || AssetManager.isV3Ready(this)),
+                        isV3Ready = AssetManager.isV3Ready(this) && (AssetManager.isV1Ready(this) || AssetManager.isV2Ready(this)),
 
                         canResume = viewModel.canResume.value,
                         onResumeClick = {
