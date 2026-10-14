@@ -130,8 +130,8 @@ android {
         applicationId = "com.brahmadeo.supertonic.tts"
         minSdk = 24
         targetSdk = 37
-        versionCode = 24
-        versionName = "3.2.7"
+        versionCode = 25
+        versionName = "3.3.1"
 
         if (!isSplitApksEnabled()) {
             ndk {
@@ -221,7 +221,7 @@ dependencies {
     implementation 'com.google.android.material:material:1.14.0'
 
     // UI structure and Audio Session handling
-    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.2'
     implementation 'androidx.media:media:1.8.0'
 
     // Compose Stack
@@ -234,8 +234,8 @@ dependencies {
     implementation 'androidx.compose.material:material-icons-extended'
 
     // ONNX Runtime (double implementation/configuration)
-    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.27.0'
-    onnxRuntime 'com.microsoft.onnxruntime:onnxruntime-android:1.27.0'
+    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.31.0'
+    onnxRuntime 'com.microsoft.onnxruntime:onnxruntime-android:1.31.0'
 
     // Readium Toolkit
     implementation "org.readium.kotlin-toolkit:readium-shared:$readium_version"
@@ -245,10 +245,10 @@ dependencies {
     }
 
     implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
-    implementation 'org.jsoup:jsoup:1.22.2'
+    implementation 'org.jsoup:jsoup:1.23.2'
 
     // Tooling and Tests
     debugImplementation 'androidx.compose.ui:ui-tooling'
     testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.json:json:20260719'
+    testImplementation 'org.json:json:20260814'
 }

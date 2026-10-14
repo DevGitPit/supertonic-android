@@ -55,6 +55,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Switch
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -281,6 +282,59 @@ class EbookOutlineActivity : ComponentActivity() {
                                     onCheckedChange = {
                                         autoPlayNext = it
                                         prefs.edit { putBoolean("pref_auto_play_next", it) }
+                                    }
+                                )
+                            }
+                        }
+                        if (!isPdf) {
+                            var footnoteMode by remember { 
+                                mutableStateOf(prefs.getString("pref_footnote_mode", "filter_citations") ?: "filter_citations") 
+                            }
+                            HorizontalDivider()
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                    Text(
+                                        text = "Footnotes",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = when (footnoteMode) {
+                                            "all" -> "Read all notes aloud"
+                                            "filter_citations" -> "Skip citations, read explanatory prose"
+                                            else -> "Don't read notes aloud"
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                FilterChip(
+                                    selected = footnoteMode != "off",
+                                    onClick = {
+                                        val nextMode = when (footnoteMode) {
+                                            "filter_citations" -> "all"
+                                            "all" -> "off"
+                                            else -> "filter_citations"
+                                        }
+                                        footnoteMode = nextMode
+                                        prefs.edit { putString("pref_footnote_mode", nextMode) }
+                                    },
+                                    label = {
+                                        Text(
+                                            text = when (footnoteMode) {
+                                                "all" -> "Read All"
+                                                "filter_citations" -> "Skip Citations"
+                                                else -> "Off"
+                                            }
+                                        )
                                     }
                                 )
                             }

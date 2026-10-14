@@ -30,4 +30,5 @@ GEMINI.md
 
 # Build Artifacts
 app/release/
+.artifacts/
 

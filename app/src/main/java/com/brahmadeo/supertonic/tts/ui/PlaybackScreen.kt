@@ -373,11 +373,20 @@ fun SentenceItem(
     isActive: Boolean,
     onClick: () -> Unit
 ) {
+    val isFootnote = text.startsWith("Footnote:", ignoreCase = true)
     val containerColor by animateColorAsState(
-        if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.surface
+        when {
+            isActive -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+            isFootnote -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            else -> MaterialTheme.colorScheme.surface
+        }
     )
     val contentColor by animateColorAsState(
-        if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+        when {
+            isActive -> MaterialTheme.colorScheme.onPrimaryContainer
+            isFootnote -> MaterialTheme.colorScheme.onSurfaceVariant
+            else -> MaterialTheme.colorScheme.onSurface
+        }
     )
 
     Card(
@@ -385,30 +394,55 @@ fun SentenceItem(
             containerColor = containerColor,
             contentColor = contentColor
         ),
-        border = if (isActive) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        border = when {
+            isActive -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+            isFootnote -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+            else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        },
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(16.dp)
         ) {
-            if (isActive) {
-                Box(
-                    modifier = Modifier
-                        .width(4.dp)
-                        .height(24.dp)
-                        .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.extraSmall)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
+            if (isFootnote) {
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = MaterialTheme.shapes.extraSmall,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                ) {
+                    Text(
+                        text = "FOOTNOTE",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
             }
-            Text(
-                text = text,
-                style = if (isActive) MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold) else MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f)
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (isActive) {
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .height(24.dp)
+                            .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.extraSmall)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+                Text(
+                    text = text,
+                    style = when {
+                        isActive -> MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+                        isFootnote -> MaterialTheme.typography.bodyMedium.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                        else -> MaterialTheme.typography.bodyLarge
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 }

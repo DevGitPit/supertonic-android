@@ -964,8 +964,19 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                 val flatLinks = links.flatten()
                 val currentIndex = flatLinks.indexOfFirst { it.href.toString() == currentChapterHref }
 
-                if (currentIndex != -1 && currentIndex + 1 < flatLinks.size) {
-                    val nextLink = flatLinks[currentIndex + 1]
+                var nextIndex = if (currentIndex != -1) currentIndex + 1 else -1
+                while (nextIndex != -1 && nextIndex < flatLinks.size) {
+                    val candidate = flatLinks[nextIndex]
+                    if (ebookParser.shouldSkipNotesChapter(publication, candidate)) {
+                        Log.i(TAG, "Auto-play: skipping consumed notes chapter ${candidate.href}")
+                        nextIndex++
+                    } else {
+                        break
+                    }
+                }
+
+                if (nextIndex != -1 && nextIndex < flatLinks.size) {
+                    val nextLink = flatLinks[nextIndex]
                     val nextHref = nextLink.href.toString()
                     
                     val extractResult = ebookParser.extractText(publication, nextLink)
