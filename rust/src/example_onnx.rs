@@ -42,7 +42,7 @@ struct Args {
     #[arg(long, value_delimiter = '|', default_values_t = vec!["This morning, I took a walk in the park, and the sound of the birds and the breeze was so pleasant that I stopped for a long time just to listen.".to_string()])]
     text: Vec<String>,
 
-    /// Language(s) for synthesis (en, ko, es, pt, fr)
+    /// Language(s) for synthesis; see the main README for all supported codes
     #[arg(long, value_delimiter = ',', default_values_t = vec!["en".to_string()])]
     lang: Vec<String>,
 
@@ -106,7 +106,7 @@ fn main() -> Result<()> {
             })?
         } else {
             let (w, d) = timer("Generating speech from text", || {
-                text_to_speech.call(&text_list[0], &lang_list[0], &style, total_step, speed, 0.3)
+                text_to_speech.call(&text_list[0], &lang_list[0], &style, total_step, speed, 0.3, |_, _, _| true)
             })?;
             (w, vec![d])
         };

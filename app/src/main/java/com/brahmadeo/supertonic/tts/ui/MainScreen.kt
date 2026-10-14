@@ -1,12 +1,19 @@
 package com.brahmadeo.supertonic.tts.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import java.util.Locale
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.MoreVert
@@ -56,6 +63,10 @@ fun MainScreen(
     selectedVoiceFile: String,
     onVoiceChange: (String) -> Unit,
 
+    preferredModelEngine: String,
+    onPreferredModelEngineChange: (String) -> Unit,
+    onCustomVoicesClick: () -> Unit,
+
     isMixingEnabled: Boolean,
     onMixingEnabledChange: (Boolean) -> Unit,
     selectedVoiceFile2: String,
@@ -79,9 +90,11 @@ fun MainScreen(
     onHistoryClick: () -> Unit,
     onQueueClick: () -> Unit,
     onLexiconClick: () -> Unit,
+    onDeleteV1Click: () -> Unit,
     onDeleteV2Click: () -> Unit,
     onDeleteV3Click: () -> Unit,
     onOpenEbookClick: () -> Unit,
+    canDeleteV1: Boolean,
     isV2Ready: Boolean,
     isV3Ready: Boolean,
 
@@ -95,6 +108,27 @@ fun MainScreen(
     onMiniPlayerPlayPauseClick: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
+
+    val defaultVoiceFiles = remember {
+        listOf(
+            "M1.json", "M2.json", "M3.json", "M4.json", "M5.json",
+            "F1.json", "F2.json", "F3.json", "F4.json", "F5.json"
+        )
+    }
+    val voiceEntries = voices.toMap()
+    val sortedVoiceNames = remember(voiceEntries) {
+        voiceEntries.keys.toList().sortedWith { name1, name2 ->
+            val file1 = voiceEntries[name1] ?: ""
+            val file2 = voiceEntries[name2] ?: ""
+            val isCustom1 = file1 !in defaultVoiceFiles
+            val isCustom2 = file2 !in defaultVoiceFiles
+            when {
+                isCustom1 && !isCustom2 -> -1
+                !isCustom1 && isCustom2 -> 1
+                else -> name1.compareTo(name2, ignoreCase = true)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -140,6 +174,10 @@ fun MainScreen(
                             onClick = { showMenu = false; onLexiconClick() },
                             enabled = currentLangCode != "ko"
                         )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(AppR.string.action_custom_voices)) },
+                            onClick = { showMenu = false; onCustomVoicesClick() }
+                        )
                         if (isV2Ready && currentLangCode == "en") {
                             DropdownMenuItem(
                                 text = { Text(stringResource(AppR.string.action_delete_v2), color = MaterialTheme.colorScheme.error) },
@@ -150,6 +188,12 @@ fun MainScreen(
                             DropdownMenuItem(
                                 text = { Text(stringResource(AppR.string.action_delete_v3), color = MaterialTheme.colorScheme.error) },
                                 onClick = { showMenu = false; onDeleteV3Click() }
+                            )
+                        }
+                        if (canDeleteV1) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(AppR.string.action_delete_v1), color = MaterialTheme.colorScheme.error) },
+                                onClick = { showMenu = false; onDeleteV1Click() }
                             )
                         }
                     }
@@ -292,9 +336,42 @@ fun MainScreen(
 
                         DropdownSelector(
                             label = stringResource(AppR.string.voice_style_label),
-                            options = voices.keys.toList().sorted(),
+                            options = sortedVoiceNames,
                             selectedOption = voices.entries.find { it.value == selectedVoiceFile }?.key ?: "",
                             onOptionSelected = { name -> onVoiceChange(voices[name] ?: "M1.json") }
+                        )
+
+                        val modelEngineOptions = listOf(
+                            stringResource(AppR.string.model_engine_default),
+                            stringResource(AppR.string.model_engine_v1),
+                            stringResource(AppR.string.model_engine_v2),
+                            stringResource(AppR.string.model_engine_v3)
+                        )
+                        val selectedEngineLabel = when (preferredModelEngine) {
+                            "v1" -> stringResource(AppR.string.model_engine_v1)
+                            "v2" -> stringResource(AppR.string.model_engine_v2)
+                            "v3" -> stringResource(AppR.string.model_engine_v3)
+                            else -> stringResource(AppR.string.model_engine_default)
+                        }
+
+                        val defaultEngineLabel = stringResource(AppR.string.model_engine_default)
+                        val v1EngineLabel = stringResource(AppR.string.model_engine_v1)
+                        val v2EngineLabel = stringResource(AppR.string.model_engine_v2)
+                        val v3EngineLabel = stringResource(AppR.string.model_engine_v3)
+
+                        DropdownSelector(
+                            label = stringResource(AppR.string.model_engine_label),
+                            options = modelEngineOptions,
+                            selectedOption = selectedEngineLabel,
+                            onOptionSelected = { label ->
+                                val code = when (label) {
+                                    v1EngineLabel -> "v1"
+                                    v2EngineLabel -> "v2"
+                                    v3EngineLabel -> "v3"
+                                    else -> "default"
+                                }
+                                onPreferredModelEngineChange(code)
+                            }
                         )
 
                         Row(
@@ -313,7 +390,7 @@ fun MainScreen(
                             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 DropdownSelector(
                                     label = stringResource(AppR.string.voice_style_2_label),
-                                    options = voices.keys.toList().sorted(),
+                                    options = sortedVoiceNames,
                                     selectedOption = voices.entries.find { it.value == selectedVoiceFile2 }?.key ?: "",
                                     onOptionSelected = { name -> onVoice2Change(voices[name] ?: "M2.json") }
                                 )
@@ -340,10 +417,11 @@ fun MainScreen(
                             label = stringResource(AppR.string.speed_label),
                             value = speed,
                             onValueChange = onSpeedChange,
-                            valueRange = 0.9f..1.5f,
-                            steps = 11,
+                            valueRange = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.SLIDER_MIN_SPEED..com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.SLIDER_MAX_SPEED,
+                            steps = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.SLIDER_STEPS,
                             displayValue = String.format(Locale.US, "%.2fx", speed),
-                            leadingIcon = Icons.Default.Speed
+                            leadingIcon = Icons.Default.Speed,
+                            isSpeedSlider = true
                         )
 
                         SliderWithLabel(
@@ -497,29 +575,122 @@ fun SliderWithLabel(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
     displayValue: String,
-    leadingIcon: ImageVector? = null
+    leadingIcon: ImageVector? = null,
+    isSpeedSlider: Boolean = false
 ) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(), 
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (leadingIcon != null) {
-                    Icon(leadingIcon, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Text(displayValue, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+    if (isSpeedSlider) {
+        val isHighSpeed = value > 1.5f
+        val isDark = isSystemInDarkTheme()
+
+        // Green styling for <= 1.5x, reddish/error styling for > 1.5x based on theme
+        val targetContainerBg = if (isHighSpeed) {
+            if (isDark) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+            else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
+        } else {
+            if (isDark) Color(0xFF1B3B22).copy(alpha = 0.45f)
+            else Color(0xFFE8F5E9).copy(alpha = 0.85f)
         }
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = valueRange,
-            steps = steps
-        )
+
+        val targetBorderColor = if (isHighSpeed) {
+            MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+        } else {
+            if (isDark) Color(0xFF81C784).copy(alpha = 0.4f)
+            else Color(0xFF4CAF50).copy(alpha = 0.5f)
+        }
+
+        val targetAccentColor = if (isHighSpeed) {
+            MaterialTheme.colorScheme.error
+        } else {
+            if (isDark) Color(0xFF81C784)
+            else Color(0xFF2E7D32)
+        }
+
+        val targetInactiveTrack = if (isHighSpeed) {
+            MaterialTheme.colorScheme.error.copy(alpha = 0.24f)
+        } else {
+            if (isDark) Color(0xFF2E7D32).copy(alpha = 0.3f)
+            else Color(0xFFA5D6A7).copy(alpha = 0.6f)
+        }
+
+        val containerBg by animateColorAsState(targetValue = targetContainerBg, label = "speed_bg")
+        val borderColor by animateColorAsState(targetValue = targetBorderColor, label = "speed_border")
+        val accentColor by animateColorAsState(targetValue = targetAccentColor, label = "speed_accent")
+        val inactiveTrackColor by animateColorAsState(targetValue = targetInactiveTrack, label = "speed_inactive_track")
+
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = containerBg,
+            border = BorderStroke(1.dp, borderColor),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (leadingIcon != null) {
+                            Icon(leadingIcon, contentDescription = null, modifier = Modifier.size(18.dp), tint = accentColor)
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = accentColor.copy(alpha = 0.15f),
+                            modifier = Modifier.padding(end = 6.dp)
+                        ) {
+                            Text(
+                                text = if (isHighSpeed) "Fast (DSP)" else "Natural",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = accentColor,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Text(displayValue, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = accentColor)
+                    }
+                }
+                Slider(
+                    value = value,
+                    onValueChange = onValueChange,
+                    valueRange = valueRange,
+                    steps = steps,
+                    colors = SliderDefaults.colors(
+                        thumbColor = accentColor,
+                        activeTrackColor = accentColor,
+                        inactiveTrackColor = inactiveTrackColor,
+                        activeTickColor = Color.Transparent,
+                        inactiveTickColor = Color.Transparent
+                    )
+                )
+            }
+        }
+    } else {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(), 
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (leadingIcon != null) {
+                        Icon(leadingIcon, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(displayValue, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            }
+            Slider(
+                value = value,
+                onValueChange = onValueChange,
+                valueRange = valueRange,
+                steps = steps
+            )
+        }
     }
 }
 
@@ -582,6 +753,9 @@ fun MainScreenPreview() {
             voices = mapOf("Voice 1" to "v1", "Voice 2" to "v2"),
             selectedVoiceFile = "v1",
             onVoiceChange = {},
+            preferredModelEngine = "default",
+            onPreferredModelEngineChange = {},
+            onCustomVoicesClick = {},
             isMixingEnabled = true,
             onMixingEnabledChange = {},
             selectedVoiceFile2 = "v2",
@@ -601,9 +775,11 @@ fun MainScreenPreview() {
             onHistoryClick = {},
             onQueueClick = {},
             onLexiconClick = {},
+            onDeleteV1Click = {},
             onDeleteV2Click = {},
             onDeleteV3Click = {},
             onOpenEbookClick = {},
+            canDeleteV1 = true,
             isV2Ready = true,
             isV3Ready = true,
             canResume = true,

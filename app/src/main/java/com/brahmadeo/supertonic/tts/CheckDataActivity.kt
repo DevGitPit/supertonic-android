@@ -4,7 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
-import java.io.File
+import com.brahmadeo.supertonic.tts.utils.AssetManager
 import java.util.ArrayList
 
 /**
@@ -18,32 +18,82 @@ class CheckDataActivity : Activity() {
 
         val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
         val savedLang = prefs.getString("selected_lang", "en") ?: "en"
-        val modelVersion = com.brahmadeo.supertonic.tts.utils.AssetManager.getModelVersionForLanguage(savedLang)
+        val preferredEngine = prefs.getString("preferred_model_engine", "default") ?: "default"
+        val modelVersion = AssetManager.resolveModelVersion(preferredEngine, savedLang)
 
         val availableVoices = ArrayList<String>()
         val unavailableVoices = ArrayList<String>()
 
         if (modelVersion == "v1") {
-            // English (v1) is bundled with the app and copied on first run
-            availableVoices.add("eng-USA")
-        } else {
-            // Check if multilingual models (v2) are present
-            val v2Dir = File(filesDir, "v2/onnx")
-            if (v2Dir.exists()) {
-                availableVoices.add("kor-KOR")
-                availableVoices.add("spa-ESP")
-                availableVoices.add("por-PRT")
-                availableVoices.add("fra-FRA")
+            // English (v1)
+            if (AssetManager.isVersionReady(this, "v1")) {
+                availableVoices.add("eng-USA")
             } else {
-                // These could be downloaded via the app's UI
-                unavailableVoices.add("kor-KOR")
-                unavailableVoices.add("spa-ESP")
-                unavailableVoices.add("por-PRT")
-                unavailableVoices.add("fra-FRA")
+                unavailableVoices.add("eng-USA")
+            }
+        } else if (modelVersion == "v2") {
+            // Multilingual models (v2)
+            val v2Langs = listOf("eng-USA", "kor-KOR", "spa-ESP", "por-PRT", "fra-FRA")
+            if (AssetManager.isVersionReady(this, "v2")) {
+                availableVoices.addAll(v2Langs)
+            } else {
+                unavailableVoices.addAll(v2Langs)
+            }
+        } else {
+            // Multilingual models (v3)
+            val v3Langs = AssetManager.V3_LANGUAGES
+                .filter { it != "na" }
+                .map { lang ->
+                    when (lang) {
+                        "en" -> "eng-USA"
+                        "ko" -> "kor-KOR"
+                        "ja" -> "jpn-JPN"
+                        "ar" -> "ara-SAU"
+                        "bg" -> "bul-BGR"
+                        "cs" -> "ces-CZE"
+                        "da" -> "dan-DNK"
+                        "de" -> "deu-DEU"
+                        "el" -> "ell-GRC"
+                        "es" -> "spa-ESP"
+                        "et" -> "est-EST"
+                        "fi" -> "fin-FIN"
+                        "fr" -> "fra-FRA"
+                        "hi" -> "hin-IND"
+                        "hr" -> "hrv-HRV"
+                        "hu" -> "hun-HUN"
+                        "id" -> "ind-IDN"
+                        "it" -> "ita-ITA"
+                        "lt" -> "lit-LTU"
+                        "lv" -> "lav-LVA"
+                        "nl" -> "nld-NLD"
+                        "pl" -> "pol-POL"
+                        "pt" -> "por-PRT"
+                        "ro" -> "ron-ROU"
+                        "ru" -> "rus-RUS"
+                        "sk" -> "slk-SVK"
+                        "sl" -> "slv-SVN"
+                        "sv" -> "swe-SWE"
+                        "tr" -> "tur-TUR"
+                        "uk" -> "ukr-UKR"
+                        "vi" -> "vie-VNM"
+                        else -> {
+                            try {
+                                val loc = java.util.Locale.forLanguageTag(lang)
+                                "${loc.isO3Language}-${loc.isO3Language.uppercase()}"
+                            } catch (_: Exception) {
+                                "$lang-$lang"
+                            }
+                        }
+                    }
+                }
+            if (AssetManager.isVersionReady(this, "v3")) {
+                availableVoices.addAll(v3Langs)
+            } else {
+                unavailableVoices.addAll(v3Langs)
             }
         }
 
-        val result = if (modelVersion == "v1" || availableVoices.isNotEmpty()) {
+        val result = if (availableVoices.isNotEmpty()) {
             TextToSpeech.Engine.CHECK_VOICE_DATA_PASS
         } else {
             TextToSpeech.Engine.CHECK_VOICE_DATA_FAIL

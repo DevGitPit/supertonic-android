@@ -44,6 +44,6 @@ impl LanguageNormalizer for EnglishNormalizer {
     }
 
     fn should_wrap_tags(&self) -> bool {
-        false
+        true
     }
 }

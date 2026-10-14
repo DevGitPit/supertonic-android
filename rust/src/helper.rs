@@ -13,7 +13,11 @@ use crate::lang::get_normalizer;
 
 // Available languages for multilingual TTS
 pub const AVAILABLE_LANGS: &[&str] = &["en", "ko", "ja", "ar", "bg", "cs", "da", "de", "el", "es", "et", "fi", "fr", "hi", "hr", "hu", "id", "it", "lt", "lv", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "tr", "uk", "vi", "na"];
+pub const AVAILABLE_LANGS_V1: &[&str] = &["en"];
+pub const AVAILABLE_LANGS_V2: &[&str] = &["en", "ko", "es", "pt", "fr"];
+pub const AVAILABLE_LANGS_V3: &[&str] = AVAILABLE_LANGS;
 
+#[allow(dead_code)]
 pub fn is_valid_lang(lang: &str) -> bool {
     AVAILABLE_LANGS.contains(&lang)
 }
@@ -70,26 +74,107 @@ pub struct StyleComponent {
     pub dtype: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModelVersion {
+    V1,
+    V2,
+    V3,
+}
+
+impl ModelVersion {
+    pub fn available_langs(&self) -> &'static [&'static str] {
+        match self {
+            ModelVersion::V1 => AVAILABLE_LANGS_V1,
+            ModelVersion::V2 => AVAILABLE_LANGS_V2,
+            ModelVersion::V3 => AVAILABLE_LANGS_V3,
+        }
+    }
+
+    pub fn is_valid_lang(&self, lang: &str) -> bool {
+        self.available_langs().contains(&lang)
+    }
+
+    pub fn from_path_and_indexer<P: AsRef<Path>>(onnx_dir: P, indexer: &[i64]) -> Self {
+        // If indexer doesn't have `<` (ASCII 60) and `>` (ASCII 62), it is definitely V1
+        let has_lt = indexer.get(60).copied().unwrap_or(-1) >= 0;
+        let has_gt = indexer.get(62).copied().unwrap_or(-1) >= 0;
+        if !has_lt || !has_gt {
+            return ModelVersion::V1;
+        }
+
+        // Try reading tts.json if available
+        let cfg_path = onnx_dir.as_ref().join("tts.json");
+        if let Ok(file) = File::open(cfg_path) {
+            if let Ok(json) = serde_json::from_reader::<_, serde_json::Value>(BufReader::new(file)) {
+                if let Some(ver) = json.get("tts_version").and_then(|v| v.as_str()) {
+                    if ver.starts_with("v1.5") {
+                        return ModelVersion::V1;
+                    } else if ver.starts_with("v1.6") {
+                        return ModelVersion::V2;
+                    } else if ver.starts_with("v1.7") {
+                        return ModelVersion::V3;
+                    }
+                }
+            }
+        }
+
+        let parent_name = onnx_dir
+            .as_ref()
+            .parent()
+            .and_then(|p| p.file_name())
+            .map(|n| n.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        if parent_name == "v2" {
+            ModelVersion::V2
+        } else if parent_name == "v1" {
+            ModelVersion::V1
+        } else if parent_name == "v3" {
+            ModelVersion::V3
+        } else if indexer.get(60).copied().unwrap_or(-1) == 27 {
+            ModelVersion::V2
+        } else {
+            ModelVersion::V3
+        }
+    }
+}
+
 // ============================================================================ 
 // Unicode Text Processor
 // ============================================================================ 
 
 pub struct UnicodeProcessor {
     indexer: Vec<i64>,
+    model_version: ModelVersion,
 }
 
 impl UnicodeProcessor {
     pub fn new<P: AsRef<Path>>(unicode_indexer_json_path: P) -> Result<Self> {
+        let path = unicode_indexer_json_path.as_ref();
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        let indexer: Vec<i64> = serde_json::from_reader(reader)?;
+        let onnx_dir = path.parent().unwrap_or(path);
+        let model_version = ModelVersion::from_path_and_indexer(onnx_dir, &indexer);
+        Ok(UnicodeProcessor { indexer, model_version })
+    }
+
+    #[allow(dead_code)]
+    pub fn with_version<P: AsRef<Path>>(unicode_indexer_json_path: P, model_version: ModelVersion) -> Result<Self> {
         let file = File::open(unicode_indexer_json_path)?;
         let reader = BufReader::new(file);
         let indexer: Vec<i64> = serde_json::from_reader(reader)?;
-        Ok(UnicodeProcessor { indexer })
+        Ok(UnicodeProcessor { indexer, model_version })
+    }
+
+    pub fn model_version(&self) -> ModelVersion {
+        self.model_version
     }
 
     pub fn call(&self, text_list: &[String], lang_list: &[String]) -> Result<(Vec<Vec<i64>>, Array3<f32>)> {
         let mut processed_texts: Vec<String> = Vec::new();
         for (text, lang) in text_list.iter().zip(lang_list.iter()) {
-            processed_texts.push(preprocess_text(text, lang)?);
+            processed_texts.push(preprocess_text(text, lang, self.model_version)?);
         }
 
         let text_ids_lengths: Vec<usize> = processed_texts
@@ -120,14 +205,22 @@ impl UnicodeProcessor {
     }
 }
 
-pub fn preprocess_text(text: &str, lang: &str) -> Result<String> {
+pub fn preprocess_text(text: &str, lang: &str, model_version: ModelVersion) -> Result<String> {
     // Validate language
-    if !is_valid_lang(lang) {
-        bail!("Invalid language: {}. Available: {:?}", lang, AVAILABLE_LANGS);
+    if !model_version.is_valid_lang(lang) {
+        bail!("Invalid language: {} for {:?}. Available: {:?}", lang, model_version, model_version.available_langs());
     }
     let normalizer = get_normalizer(lang);
     let mut preprocessed = normalizer.preprocess(text);
-    if normalizer.should_wrap_tags() {
+
+    // Model V1 has no tag tokens (< and > are -1 in indexer), so tags are never wrapped.
+    // Models V2 and V3 wrap tags for all supported languages, including English.
+    let should_wrap = match model_version {
+        ModelVersion::V1 => false,
+        ModelVersion::V2 | ModelVersion::V3 => normalizer.should_wrap_tags(),
+    };
+
+    if should_wrap {
         preprocessed = format!("<{}>{}</{}>", lang, preprocessed, lang);
     }
     Ok(preprocessed)
@@ -463,6 +556,7 @@ pub struct TextToSpeech {
     vector_est_ort: Session,
     vocoder_ort: Session,
     pub sample_rate: i32,
+    pub model_version: ModelVersion,
 }
 
 impl TextToSpeech {
@@ -475,6 +569,7 @@ impl TextToSpeech {
         vocoder_ort: Session,
     ) -> Self {
         let sample_rate = cfgs.ae.sample_rate;
+        let model_version = text_processor.model_version();
         TextToSpeech {
             cfgs,
             text_processor,
@@ -483,6 +578,7 @@ impl TextToSpeech {
             vector_est_ort,
             vocoder_ort,
             sample_rate,
+            model_version,
         }
     }
 
@@ -815,6 +911,7 @@ pub fn load_text_to_speech(onnx_dir: &str, use_gpu: bool, use_xnnpack: bool, ort
 
     let unicode_indexer_path = format!("{}/unicode_indexer.json", onnx_dir);
     let text_processor = UnicodeProcessor::new(&unicode_indexer_path)?;
+    log::info!("Initialized TextToSpeech with model version: {:?}", text_processor.model_version());
 
     Ok(TextToSpeech::new(
         cfgs,
@@ -835,12 +932,12 @@ mod tests {
     fn test_preprocess_text_french_apostrophe() {
         // Test with right-single-quote (typographic apostrophe U+2019)
         let input_typographic = "l’oiseau s’envole";
-        let result_typographic = preprocess_text(input_typographic, "fr").unwrap();
+        let result_typographic = preprocess_text(input_typographic, "fr", ModelVersion::V3).unwrap();
         assert_eq!(result_typographic, "<fr>l'oiseau s'envole.</fr>");
 
         // Test with straight apostrophe U+0027
         let input_straight = "l'oiseau s'envole";
-        let result_straight = preprocess_text(input_straight, "fr").unwrap();
+        let result_straight = preprocess_text(input_straight, "fr", ModelVersion::V3).unwrap();
         assert_eq!(result_straight, "<fr>l'oiseau s'envole.</fr>");
     }
 
@@ -848,20 +945,31 @@ mod tests {
     fn test_preprocess_text_english_normalization() {
         // Test English-specific expansion and ending punctuation
         let input = "hello @ world";
-        let result = preprocess_text(input, "en").unwrap();
-        assert_eq!(result, "hello at world.");
+        // V1: tags are NOT wrapped
+        let result_v1 = preprocess_text(input, "en", ModelVersion::V1).unwrap();
+        assert_eq!(result_v1, "hello at world.");
+
+        // V2 and V3: tags ARE wrapped with <en>
+        let result_v2 = preprocess_text(input, "en", ModelVersion::V2).unwrap();
+        assert_eq!(result_v2, "<en>hello at world.</en>");
+
+        let result_v3 = preprocess_text(input, "en", ModelVersion::V3).unwrap();
+        assert_eq!(result_v3, "<en>hello at world.</en>");
 
         // Test if a trailing period is correctly preserved without duplication
         let input_period = "hello world.";
-        let result_period = preprocess_text(input_period, "en").unwrap();
-        assert_eq!(result_period, "hello world.");
+        let result_period_v1 = preprocess_text(input_period, "en", ModelVersion::V1).unwrap();
+        assert_eq!(result_period_v1, "hello world.");
+
+        let result_period_v3 = preprocess_text(input_period, "en", ModelVersion::V3).unwrap();
+        assert_eq!(result_period_v3, "<en>hello world.</en>");
     }
 
     #[test]
     fn test_preprocess_text_korean_no_period() {
         // Test Korean text normalization - it should not have trailing period
         let input = "안녕하세요";
-        let result = preprocess_text(input, "ko").unwrap();
+        let result = preprocess_text(input, "ko", ModelVersion::V3).unwrap();
         assert!(!result.contains('.'));
         assert!(result.starts_with("<ko>"));
         assert!(result.ends_with("</ko>"));
@@ -928,12 +1036,12 @@ mod tests {
     fn test_preprocess_text_unmatched_quotes() {
         // Test double quote cleanup in preprocess_text
         let input = "He talked to her first.\"";
-        let result = preprocess_text(input, "en").unwrap();
+        let result = preprocess_text(input, "en", ModelVersion::V1).unwrap();
         assert_eq!(result, "He talked to her first.");
 
         // Test single quote cleanup in preprocess_text
         let input_single = "He talked to her first.'";
-        let result_single = preprocess_text(input_single, "en").unwrap();
+        let result_single = preprocess_text(input_single, "en", ModelVersion::V1).unwrap();
         assert_eq!(result_single, "He talked to her first.");
     }
 
@@ -957,7 +1065,7 @@ mod tests {
         // Test that spaces before punctuation are handled and sentences still split correctly
         let input = "Bonjour ! Comment allez-vous ?";
         // preprocess_text should normalize this.
-        let result = preprocess_text(input, "fr").unwrap();
+        let result = preprocess_text(input, "fr", ModelVersion::V3).unwrap();
         // Since preprocess_text adds <fr> tags and common_preprocess/fr_preprocess remove space before !
         assert_eq!(result, "<fr>Bonjour! Comment allez-vous?</fr>");
         
@@ -969,30 +1077,30 @@ mod tests {
     #[test]
     fn test_preprocess_text_french_guillemets() {
         let input = "« Bonjour »";
-        let result = preprocess_text(input, "fr").unwrap();
+        let result = preprocess_text(input, "fr", ModelVersion::V3).unwrap();
         assert_eq!(result, "<fr>\"Bonjour\"</fr>");
     }
 
     #[test]
     fn test_preprocess_text_v3_languages() {
         // Test Japanese / V3 tag wrapping
-        let result_ja = preprocess_text("こんにちは", "ja").unwrap();
+        let result_ja = preprocess_text("こんにちは", "ja", ModelVersion::V3).unwrap();
         assert_eq!(result_ja, "<ja>こんにちは.</ja>");
 
         // Test Japanese / V3 preserving existing Japanese full stop
-        let result_ja_punct = preprocess_text("こんにちは。", "ja").unwrap();
+        let result_ja_punct = preprocess_text("こんにちは。", "ja", ModelVersion::V3).unwrap();
         assert_eq!(result_ja_punct, "<ja>こんにちは。</ja>");
 
         // Test Arabic / V3 tag wrapping
-        let result_ar = preprocess_text("مرحبا", "ar").unwrap();
+        let result_ar = preprocess_text("مرحبا", "ar", ModelVersion::V3).unwrap();
         assert_eq!(result_ar, "<ar>مرحبا.</ar>");
 
         // Test Hindi / V3 tag wrapping and check that purna viram (U+0964) is treated as punctuation
-        let result_hi = preprocess_text("पहला पड़ाव था- UAE।", "hi").unwrap();
+        let result_hi = preprocess_text("पहला पड़ाव था- UAE।", "hi", ModelVersion::V3).unwrap();
         assert_eq!(result_hi, "<hi>पहला पड़ाव था- UAE।</hi>");
 
         // Test that invalid language code fails
-        assert!(preprocess_text("hello", "invalid").is_err());
+        assert!(preprocess_text("hello", "invalid", ModelVersion::V3).is_err());
     }
 
     #[test]
@@ -1018,5 +1126,62 @@ mod tests {
             println!("Rust Chunk {}: {}", i, chunk);
         }
     }
+
+    #[test]
+    fn test_model_version_available_langs() {
+        // V1: only "en" is valid
+        assert!(ModelVersion::V1.is_valid_lang("en"));
+        assert!(!ModelVersion::V1.is_valid_lang("ko"));
+        assert!(!ModelVersion::V1.is_valid_lang("fr"));
+        assert!(!ModelVersion::V1.is_valid_lang("ja"));
+        assert!(preprocess_text("hello", "ko", ModelVersion::V1).is_err());
+
+        // V2: en, ko, es, pt, fr
+        assert!(ModelVersion::V2.is_valid_lang("en"));
+        assert!(ModelVersion::V2.is_valid_lang("ko"));
+        assert!(ModelVersion::V2.is_valid_lang("es"));
+        assert!(ModelVersion::V2.is_valid_lang("pt"));
+        assert!(ModelVersion::V2.is_valid_lang("fr"));
+        assert!(!ModelVersion::V2.is_valid_lang("ja"));
+        assert!(!ModelVersion::V2.is_valid_lang("hi"));
+        assert!(preprocess_text("hello", "ja", ModelVersion::V2).is_err());
+
+        // V3: all languages including na
+        assert!(ModelVersion::V3.is_valid_lang("en"));
+        assert!(ModelVersion::V3.is_valid_lang("ko"));
+        assert!(ModelVersion::V3.is_valid_lang("ja"));
+        assert!(ModelVersion::V3.is_valid_lang("hi"));
+        assert!(ModelVersion::V3.is_valid_lang("na"));
+
+        // V2/V3 wrap tags for all valid languages including English
+        assert_eq!(preprocess_text("hello", "en", ModelVersion::V2).unwrap(), "<en>hello.</en>");
+        assert_eq!(preprocess_text("hello", "en", ModelVersion::V3).unwrap(), "<en>hello.</en>");
+        assert_eq!(preprocess_text("hello", "na", ModelVersion::V3).unwrap(), "<na>hello.</na>");
+
+        // V1 never wraps tags
+        assert_eq!(preprocess_text("hello", "en", ModelVersion::V1).unwrap(), "hello.");
+    }
+
+    #[test]
+    fn test_model_version_from_path() {
+        // Construct a mock indexer that has '<' (60) and '>' (62) to pass the initial tag check
+        let mut indexer = vec![0i64; 65];
+        indexer[60] = 100;
+        indexer[62] = 101;
+
+        // Parent dir "v2" -> V2
+        assert_eq!(ModelVersion::from_path_and_indexer("/app/files/v2/onnx", &indexer), ModelVersion::V2);
+        // Parent dir "v1" -> V1
+        assert_eq!(ModelVersion::from_path_and_indexer("/app/files/v1/onnx", &indexer), ModelVersion::V1);
+        // Parent dir "v3" -> V3
+        assert_eq!(ModelVersion::from_path_and_indexer("/app/files/v3/onnx", &indexer), ModelVersion::V3);
+        // Case-insensitive: "V3"
+        assert_eq!(ModelVersion::from_path_and_indexer("/app/files/V3/onnx", &indexer), ModelVersion::V3);
+
+        // Ancestor has "v1" or "v2", but parent directory is "v3" -> must resolve to V3
+        assert_eq!(ModelVersion::from_path_and_indexer("/data/v1/app/files/v3/onnx", &indexer), ModelVersion::V3);
+        assert_eq!(ModelVersion::from_path_and_indexer("/data/v2/app/files/v1/onnx", &indexer), ModelVersion::V1);
+    }
 }
+
 

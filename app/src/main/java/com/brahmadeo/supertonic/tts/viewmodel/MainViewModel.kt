@@ -47,10 +47,16 @@ class MainViewModel : ViewModel() {
     var showQueueDialog = mutableStateOf(false)
     var queueDialogText = ""
     var showV2ConfirmDialog = mutableStateOf(false)
+    var showV1DeleteDialog = mutableStateOf(false)
     var showV2DeleteDialog = mutableStateOf(false)
     var showV3ConfirmDialog = mutableStateOf(false)
     var showV3DeleteDialog = mutableStateOf(false)
+    var showDeleteVoiceConfirmDialog = mutableStateOf(false)
+    var pendingDeleteVoiceFile = mutableStateOf<String?>(null)
+    var showCustomVoicesDialog = mutableStateOf(false)
+    var preferredModelEngine = mutableStateOf("default") // "default", "v1", "v2", "v3"
     var pendingLangCode = ""
+    var pendingEngineCode = ""
 
     // Data
     val voiceFiles = mutableStateMapOf<String, String>()

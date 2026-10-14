@@ -346,3 +346,19 @@ pub extern "system" fn Java_com_brahmadeo_supertonic_tts_SupertonicTTS_nativeChu
         Err(_) => std::ptr::null_mut(),
     }
 }
+
+#[no_mangle]
+pub extern "system" fn Java_com_brahmadeo_supertonic_tts_SupertonicTTS_getModelVersion(
+    _env: JNIEnv,
+    _class: JClass,
+    ptr: jlong,
+) -> jint {
+    if ptr == 0 { return 0; }
+    let engine = unsafe { &*(ptr as *mut SupertonicEngine) };
+    match engine.tts.model_version {
+        helper::ModelVersion::V1 => 1,
+        helper::ModelVersion::V2 => 2,
+        helper::ModelVersion::V3 => 3,
+    }
+}
+

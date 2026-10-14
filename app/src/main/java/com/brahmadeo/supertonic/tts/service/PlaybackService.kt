@@ -15,6 +15,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import android.media.PlaybackParams
 import android.os.Build
 import android.os.IBinder
 import android.os.RemoteCallbackList
@@ -101,6 +102,14 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         override fun getSleepTimerSeconds(): Int {
             return sleepTimerSecondsRemaining
         }
+
+        override fun setSpeed(speed: Float) {
+            this@PlaybackService.setPlaybackSpeed(speed)
+        }
+
+        override fun getSpeed(): Float {
+            return this@PlaybackService.getPlaybackSpeed()
+        }
     }
 
     private val listeners = RemoteCallbackList<IPlaybackListener>()
@@ -113,6 +122,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                 listener.onProgress(currentSentenceIndex, -1)
                 listener.onTransitioningChanged(isTransitioningChapter)
                 listener.onSleepTimerUpdated(sleepTimerSecondsRemaining)
+                listener.onSpeedChanged(playbackSpeed)
             } catch (_: RemoteException) {}
         }
     }
@@ -133,6 +143,16 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
         listeners.finishBroadcast()
     }
 
+    private fun notifyListenerSpeedChanged(speed: Float) {
+        val n = listeners.beginBroadcast()
+        for (i in 0 until n) {
+            try {
+                listeners.getBroadcastItem(i).onSpeedChanged(speed)
+            } catch (_: RemoteException) {}
+        }
+        listeners.finishBroadcast()
+    }
+
     private lateinit var mediaSession: MediaSessionCompat
     private var audioTrack: AudioTrack? = null
     private var lastTrackRate: Int = -1
@@ -143,6 +163,32 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
     private var resumeOnFocusGain = false
     @Volatile private var isTransitioningChapter = false
     @Volatile private var sleepTimerSecondsRemaining = 0
+    @Volatile private var playbackSpeed: Float = 1.1f
+
+    fun getPlaybackSpeed(): Float = playbackSpeed
+
+    fun setPlaybackSpeed(speed: Float) {
+        val clamped = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.clampPlaybackSpeed(speed)
+        playbackSpeed = clamped
+        getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).edit {
+            putFloat("last_speed", clamped)
+            putFloat("speed", clamped)
+        }
+        synchronized(this) {
+            audioTrack?.let { track ->
+                if (track.state == AudioTrack.STATE_INITIALIZED) {
+                    try {
+                        val params = track.playbackParams
+                        params.speed = clamped
+                        track.playbackParams = params
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to update AudioTrack speed", e)
+                    }
+                }
+            }
+        }
+        notifyListenerSpeedChanged(clamped)
+    }
     
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private var wakeLock: android.os.PowerManager.WakeLock? = null
@@ -214,11 +260,22 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
             isActive = true
         }
 
-        val savedLang = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).getString("selected_lang", "en") ?: "en"
-        val modelVersion = com.brahmadeo.supertonic.tts.utils.AssetManager.getModelVersionForLanguage(savedLang)
-        val modelPath = File(filesDir, "$modelVersion/onnx").absolutePath
-        val libPath = applicationInfo.nativeLibraryDir + "/libonnxruntime.so"
-        SupertonicTTS.initialize(modelPath, libPath)
+        val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+        val rawSpeed = prefs.getFloat("last_speed", prefs.getFloat("speed", 1.1f))
+        val validatedSpeed = if (rawSpeed.isNaN()) 1.1f else rawSpeed
+        playbackSpeed = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.clampPlaybackSpeed(validatedSpeed)
+        val savedLang = prefs.getString("selected_lang", "en") ?: "en"
+        val preferredEngine = prefs.getString("preferred_model_engine", "default") ?: "default"
+        val modelVersion = com.brahmadeo.supertonic.tts.utils.AssetManager.resolveModelVersion(preferredEngine, savedLang)
+        if (com.brahmadeo.supertonic.tts.utils.AssetManager.isVersionReady(this, modelVersion)) {
+            val modelPath = File(filesDir, "$modelVersion/onnx").absolutePath
+            val libPath = applicationInfo.nativeLibraryDir + "/libonnxruntime.so"
+            serviceScope.launch(Dispatchers.IO) {
+                if (!SupertonicTTS.isInitialized(modelPath)) {
+                    SupertonicTTS.initialize(modelPath, libPath)
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -228,14 +285,19 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
             // Stop playback properly first, which cancels native synthesis
             stopServicePlayback()
             
-            // Perform release and initialization off the main thread to avoid ANRs
+            // Perform initialization off the main thread if needed
             serviceScope.launch(Dispatchers.IO) {
-                SupertonicTTS.release()
-                val savedLang = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).getString("selected_lang", "en") ?: "en"
-                val modelVersion = com.brahmadeo.supertonic.tts.utils.AssetManager.getModelVersionForLanguage(savedLang)
-                val modelPath = File(filesDir, "$modelVersion/onnx").absolutePath
-                val libPath = applicationInfo.nativeLibraryDir + "/libonnxruntime.so"
-                SupertonicTTS.initialize(modelPath, libPath)
+                val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+                val savedLang = prefs.getString("selected_lang", "en") ?: "en"
+                val preferredEngine = prefs.getString("preferred_model_engine", "default") ?: "default"
+                val modelVersion = com.brahmadeo.supertonic.tts.utils.AssetManager.resolveModelVersion(preferredEngine, savedLang)
+                if (com.brahmadeo.supertonic.tts.utils.AssetManager.isVersionReady(this@PlaybackService, modelVersion)) {
+                    val modelPath = File(filesDir, "$modelVersion/onnx").absolutePath
+                    val libPath = applicationInfo.nativeLibraryDir + "/libonnxruntime.so"
+                    if (!SupertonicTTS.isInitialized(modelPath)) {
+                        SupertonicTTS.initialize(modelPath, libPath)
+                    }
+                }
             }
         }
         return START_NOT_STICKY
@@ -260,6 +322,11 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
     private var loadChapterJob: Job? = null
 
     fun synthesizeAndPlay(text: String, lang: String, stylePath: String, speed: Float, steps: Int, startIndex: Int = 0) {
+        val clampedSpeed = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.clampPlaybackSpeed(speed)
+        playbackSpeed = clampedSpeed
+        getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).edit {
+            putFloat("last_speed", clampedSpeed)
+        }
         serviceScope.launch {
             if (synthesisJob?.isActive == true) {
                 SupertonicTTS.setCancelled(true)
@@ -291,6 +358,23 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
             }
 
             synthesisJob = launch(Dispatchers.IO) {
+                val modelVersion = when {
+                    stylePath.contains("/v3/") || stylePath.contains("${File.separator}v3${File.separator}") -> "v3"
+                    stylePath.contains("/v2/") || stylePath.contains("${File.separator}v2${File.separator}") -> "v2"
+                    stylePath.contains("/v1/") || stylePath.contains("${File.separator}v1${File.separator}") -> "v1"
+                    else -> {
+                        val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+                        val preferredEngine = prefs.getString("preferred_model_engine", "default") ?: "default"
+                        com.brahmadeo.supertonic.tts.utils.AssetManager.resolveModelVersion(preferredEngine, lang)
+                    }
+                }
+                val modelPath = File(filesDir, "$modelVersion/onnx").absolutePath
+                val libPath = applicationInfo.nativeLibraryDir + "/libonnxruntime.so"
+                if (!SupertonicTTS.isInitialized(modelPath)) {
+                    Log.i(TAG, "Reinitializing engine for $modelVersion at $modelPath")
+                    SupertonicTTS.initialize(modelPath, libPath)
+                }
+
                 // Channel size 10 to allow producer to stay ahead
                 val channel = kotlinx.coroutines.channels.Channel<PlaybackItem>(10)
                 val preBufferComplete = CompletableDeferred<Unit>()
@@ -315,7 +399,7 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                         val normalizedText = textNormalizer.normalize(sentence, sentenceLang, isAdvancedEnabled)
 
                         val audioData = SupertonicTTS.generateAudio(
-                            normalizedText, sentenceLang, stylePath, speed, 0.0f, steps, VOLUME_BOOST_FACTOR, null, sibilanceMode
+                            normalizedText, sentenceLang, stylePath, 1.0f, 0.0f, steps, VOLUME_BOOST_FACTOR, null, sibilanceMode
                         )
                         
                         if (audioData != null && audioData.isNotEmpty()) {
@@ -415,9 +499,25 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                     }
 
                     track = builder.build()
+                    try {
+                        val params = PlaybackParams().apply { speed = playbackSpeed }
+                        track.playbackParams = params
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to set initial playbackParams on AudioTrack", e)
+                    }
                     
                     audioTrack = track
                     lastTrackRate = rate
+                } else {
+                    try {
+                        val params = track.playbackParams
+                        if (params.speed != playbackSpeed) {
+                            params.speed = playbackSpeed
+                            track.playbackParams = params
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to update playbackParams on reused AudioTrack", e)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to create AudioTrack", e)
@@ -723,6 +823,23 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
             synthesisJob = launch(Dispatchers.IO) {
                 var exportSuccess = false
                 try {
+                    val modelVersion = when {
+                        stylePath.contains("/v3/") || stylePath.contains("${File.separator}v3${File.separator}") -> "v3"
+                        stylePath.contains("/v2/") || stylePath.contains("${File.separator}v2${File.separator}") -> "v2"
+                        stylePath.contains("/v1/") || stylePath.contains("${File.separator}v1${File.separator}") -> "v1"
+                        else -> {
+                            val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
+                            val preferredEngine = prefs.getString("preferred_model_engine", "default") ?: "default"
+                            com.brahmadeo.supertonic.tts.utils.AssetManager.resolveModelVersion(preferredEngine, lang)
+                        }
+                    }
+                    val modelPath = File(filesDir, "$modelVersion/onnx").absolutePath
+                    val libPath = applicationInfo.nativeLibraryDir + "/libonnxruntime.so"
+                    if (!SupertonicTTS.isInitialized(modelPath)) {
+                        Log.i(TAG, "Export: Reinitializing engine for $modelVersion at $modelPath")
+                        SupertonicTTS.initialize(modelPath, libPath)
+                    }
+
                     val sentences = textNormalizer.splitIntoSentences(text, lang)
                     if (sentences.isEmpty()) {
                         Log.w(TAG, "Export: No sentences found")
@@ -742,7 +859,8 @@ class PlaybackService : Service(), SupertonicTTS.ProgressListener, AudioManager.
                         val sibilanceMode = prefs.getInt("sibilance_reduction_mode", 1)
                         val normalizedText = textNormalizer.normalize(sentence, lang, isAdvancedEnabled)
 
-                        val audioData = SupertonicTTS.generateAudio(normalizedText, lang, stylePath, speed, 0.0f, steps, VOLUME_BOOST_FACTOR, null, sibilanceMode)
+                        val exportSpeed = speed.coerceIn(SupertonicTTS.MIN_SPEED, SupertonicTTS.MAX_NEURAL_SPEED)
+                        val audioData = SupertonicTTS.generateAudio(normalizedText, lang, stylePath, exportSpeed, 0.0f, steps, VOLUME_BOOST_FACTOR, null, sibilanceMode)
                         if (audioData != null && audioData.isNotEmpty()) {
                             outputStream.write(audioData)
                         } else if (SupertonicTTS.isCancelled()) {

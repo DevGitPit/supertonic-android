@@ -21,6 +21,7 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.remember
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.core.content.ContextCompat
@@ -45,6 +46,32 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import androidx.core.content.edit
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 
 class MainActivity : ComponentActivity() {
 
@@ -125,6 +152,11 @@ class MainActivity : ComponentActivity() {
         }
         override fun onTransitioningChanged(isTransitioning: Boolean) { }
         override fun onSleepTimerUpdated(secondsRemaining: Int) { }
+        override fun onSpeedChanged(speed: Float) {
+            runOnUiThread {
+                viewModel.currentSpeed.floatValue = speed
+            }
+        }
     }
 
     private val connection = object : ServiceConnection {
@@ -208,6 +240,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val voiceStylePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { importVoiceStyle(it) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -226,7 +264,7 @@ class MainActivity : ComponentActivity() {
 
         // Initial setup based on saved language
         val savedLang = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE).getString("selected_lang", MainViewModel.DEFAULT_LANG) ?: MainViewModel.DEFAULT_LANG
-        currentModelVersion = AssetManager.getModelVersionForLanguage(savedLang)
+        currentModelVersion = resolveModelVersion(savedLang)
 
         // On FIRST LAUNCH, we check/download the required version.
         // If English (default), we ensure V1 is ready.
@@ -289,6 +327,7 @@ class MainActivity : ComponentActivity() {
                     if (viewModel.showV2ConfirmDialog.value) {
                         androidx.compose.material3.AlertDialog(
                              onDismissRequest = { 
+                                 viewModel.pendingEngineCode = ""
                                  viewModel.showV2ConfirmDialog.value = false
                              },
                             title = { Text(getString(R.string.v2_download_title)) },
@@ -296,18 +335,42 @@ class MainActivity : ComponentActivity() {
                             confirmButton = {
                                 TextButton(onClick = {
                                     val lang = viewModel.pendingLangCode
-                                    viewModel.currentLang.value = lang
-                                    saveStringPref("selected_lang", lang)
+                                    val engine = viewModel.pendingEngineCode.ifEmpty { viewModel.preferredModelEngine.value }
+                                    viewModel.pendingEngineCode = ""
                                     viewModel.showV2ConfirmDialog.value = false
-                                    switchModel("v2")
-                                    val resetIntent = Intent(this@MainActivity, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
-                                    startService(resetIntent)
+                                    applyPreferredModelEngine(engine, "v2", lang)
                                 }) { Text(getString(R.string.v2_download_button)) }
                             },
                             dismissButton = {
                                  TextButton(onClick = {
+                                     viewModel.pendingEngineCode = ""
                                      viewModel.showV2ConfirmDialog.value = false
                                  }) { Text(getString(R.string.cancel)) }
+                            }
+                        )
+                    }
+
+                    if (viewModel.showV1DeleteDialog.value) {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { viewModel.showV1DeleteDialog.value = false },
+                            title = { Text(getString(R.string.v1_delete_title)) },
+                            text = { Text(getString(R.string.v1_delete_message)) },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        AssetManager.deleteVersion(this@MainActivity, "v1")
+                                        viewModel.showV1DeleteDialog.value = false
+                                        if (viewModel.preferredModelEngine.value == "v1") {
+                                            viewModel.preferredModelEngine.value = "default"
+                                            saveStringPref("preferred_model_engine", "default")
+                                        }
+                                        Toast.makeText(this@MainActivity, getString(R.string.v1_deleted_msg), Toast.LENGTH_SHORT).show()
+                                    },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                ) { Text(getString(R.string.delete)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { viewModel.showV1DeleteDialog.value = false }) { Text(getString(R.string.cancel)) }
                             }
                         )
                     }
@@ -320,12 +383,27 @@ class MainActivity : ComponentActivity() {
                             confirmButton = {
                                 TextButton(
                                     onClick = {
+                                        val resolved = resolveModelVersion(viewModel.currentLang.value)
+                                        val canRetainV3 = resolved == "v3" && AssetManager.isV3Ready(this@MainActivity)
+                                        if (!canRetainV3 && !AssetManager.isV1Ready(this@MainActivity)) {
+                                            viewModel.showV2DeleteDialog.value = false
+                                            Toast.makeText(this@MainActivity, "Cannot delete: Model v1 is not ready", Toast.LENGTH_SHORT).show()
+                                            return@TextButton
+                                        }
                                         AssetManager.deleteVersion(this@MainActivity, "v2")
                                         viewModel.showV2DeleteDialog.value = false
-                                        // Ensure we are on English/V1
-                                        viewModel.currentLang.value = "en"
-                                        saveStringPref("selected_lang", "en")
-                                        switchModel("v1")
+                                        if (viewModel.preferredModelEngine.value == "v2") {
+                                            viewModel.preferredModelEngine.value = "default"
+                                            saveStringPref("preferred_model_engine", "default")
+                                        }
+                                        if (canRetainV3) {
+                                            switchModel("v3")
+                                        } else if (AssetManager.isV1Ready(this@MainActivity)) {
+                                            // Ensure we are on English/V1
+                                            viewModel.currentLang.value = "en"
+                                            saveStringPref("selected_lang", "en")
+                                            switchModel("v1")
+                                        }
                                         val resetIntent = Intent(this@MainActivity, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
                                         startService(resetIntent)
                                         Toast.makeText(this@MainActivity, getString(R.string.v2_deleted_msg), Toast.LENGTH_SHORT).show()
@@ -342,6 +420,7 @@ class MainActivity : ComponentActivity() {
                     if (viewModel.showV3ConfirmDialog.value) {
                         androidx.compose.material3.AlertDialog(
                              onDismissRequest = { 
+                                 viewModel.pendingEngineCode = ""
                                  viewModel.showV3ConfirmDialog.value = false
                              },
                             title = { Text(getString(R.string.v3_download_title)) },
@@ -349,16 +428,15 @@ class MainActivity : ComponentActivity() {
                             confirmButton = {
                                 TextButton(onClick = {
                                     val lang = viewModel.pendingLangCode
-                                    viewModel.currentLang.value = lang
-                                    saveStringPref("selected_lang", lang)
+                                    val engine = viewModel.pendingEngineCode.ifEmpty { viewModel.preferredModelEngine.value }
+                                    viewModel.pendingEngineCode = ""
                                     viewModel.showV3ConfirmDialog.value = false
-                                    switchModel("v3")
-                                    val resetIntent = Intent(this@MainActivity, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
-                                    startService(resetIntent)
+                                    applyPreferredModelEngine(engine, "v3", lang)
                                 }) { Text(getString(R.string.v3_download_button)) }
                             },
                             dismissButton = {
                                  TextButton(onClick = {
+                                     viewModel.pendingEngineCode = ""
                                      viewModel.showV3ConfirmDialog.value = false
                                  }) { Text(getString(R.string.cancel)) }
                             }
@@ -373,12 +451,27 @@ class MainActivity : ComponentActivity() {
                             confirmButton = {
                                 TextButton(
                                     onClick = {
+                                        val resolved = resolveModelVersion(viewModel.currentLang.value)
+                                        val canRetainV2 = resolved == "v2" && AssetManager.isV2Ready(this@MainActivity)
+                                        if (!canRetainV2 && !AssetManager.isV1Ready(this@MainActivity)) {
+                                            viewModel.showV3DeleteDialog.value = false
+                                            Toast.makeText(this@MainActivity, "Cannot delete: Model v1 is not ready", Toast.LENGTH_SHORT).show()
+                                            return@TextButton
+                                        }
                                         AssetManager.deleteVersion(this@MainActivity, "v3")
                                         viewModel.showV3DeleteDialog.value = false
-                                        // Ensure we are on English/V1
-                                        viewModel.currentLang.value = "en"
-                                        saveStringPref("selected_lang", "en")
-                                        switchModel("v1")
+                                        if (viewModel.preferredModelEngine.value == "v3") {
+                                            viewModel.preferredModelEngine.value = "default"
+                                            saveStringPref("preferred_model_engine", "default")
+                                        }
+                                        if (canRetainV2) {
+                                            switchModel("v2")
+                                        } else if (AssetManager.isV1Ready(this@MainActivity)) {
+                                            // Ensure we are on English/V1
+                                            viewModel.currentLang.value = "en"
+                                            saveStringPref("selected_lang", "en")
+                                            switchModel("v1")
+                                        }
                                         val resetIntent = Intent(this@MainActivity, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
                                         startService(resetIntent)
                                         Toast.makeText(this@MainActivity, getString(R.string.v3_deleted_msg), Toast.LENGTH_SHORT).show()
@@ -388,6 +481,144 @@ class MainActivity : ComponentActivity() {
                             },
                             dismissButton = {
                                 TextButton(onClick = { viewModel.showV3DeleteDialog.value = false }) { Text(getString(R.string.cancel)) }
+                            }
+                        )
+                    }
+
+                    if (viewModel.showDeleteVoiceConfirmDialog.value) {
+                        val voiceFile = viewModel.pendingDeleteVoiceFile.value ?: viewModel.selectedVoiceFile.value
+                        val voiceName = voiceFile.removeSuffix(".json")
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = {
+                                viewModel.pendingDeleteVoiceFile.value = null
+                                viewModel.showDeleteVoiceConfirmDialog.value = false
+                            },
+                            title = { Text(getString(R.string.delete_voice_title)) },
+                            text = { Text(getString(R.string.delete_voice_message, voiceName)) },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        viewModel.showDeleteVoiceConfirmDialog.value = false
+                                        deleteVoiceStyle()
+                                    },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                ) { Text(getString(R.string.delete)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = {
+                                    viewModel.pendingDeleteVoiceFile.value = null
+                                    viewModel.showDeleteVoiceConfirmDialog.value = false
+                                }) { Text(getString(R.string.cancel)) }
+                            }
+                        )
+                    }
+
+                    if (viewModel.showCustomVoicesDialog.value) {
+                        val defaultVoiceFiles = remember {
+                            listOf(
+                                "M1.json", "M2.json", "M3.json", "M4.json", "M5.json",
+                                "F1.json", "F2.json", "F3.json", "F4.json", "F5.json"
+                            )
+                        }
+                        val customVoices = remember(viewModel.voiceFiles.size, viewModel.selectedVoiceFile.value) {
+                            viewModel.voiceFiles.entries.filter { it.value !in defaultVoiceFiles }
+                        }
+                        
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { viewModel.showCustomVoicesDialog.value = false },
+                            title = { Text(getString(R.string.custom_voices_title)) },
+                            text = {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    Text(
+                                        text = getString(R.string.custom_voices_desc),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+
+                                    val linkStyle = SpanStyle(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        textDecoration = TextDecoration.Underline
+                                    )
+                                    val annotatedString = buildAnnotatedString {
+                                        append("Tip: Voice styles are .json files containing speaker characteristics. You can extract them from your own voice recordings using the external python project: ")
+                                        withLink(LinkAnnotation.Url("https://github.com/saurabhv749/supertonic3-voice-clone", styles = TextLinkStyles(style = linkStyle))) {
+                                            append("supertonic3-voice-clone")
+                                        }
+                                        append(" on a computer.")
+                                    }
+
+                                    Text(
+                                        text = annotatedString,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    
+                                    Button(
+                                        onClick = {
+                                            voiceStylePickerLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*"))
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = null
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(getString(R.string.import_voice_style_button))
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    
+                                    if (customVoices.isEmpty()) {
+                                        Text(
+                                            text = "No custom voices imported yet.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            modifier = Modifier.padding(vertical = 16.dp)
+                                        )
+                                    } else {
+                                        val scrollState = rememberScrollState()
+                                        Column(
+                                            modifier = Modifier
+                                                .heightIn(max = 240.dp)
+                                                .verticalScroll(scrollState),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            for (entry in customVoices) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = entry.key,
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                    IconButton(
+                                                        onClick = {
+                                                            viewModel.pendingDeleteVoiceFile.value = entry.value
+                                                            viewModel.showDeleteVoiceConfirmDialog.value = true
+                                                        }
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Delete,
+                                                            contentDescription = "Delete Voice",
+                                                            tint = MaterialTheme.colorScheme.error
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { viewModel.showCustomVoicesDialog.value = false }) {
+                                    Text(getString(R.string.close_button))
+                                }
                             }
                         )
                     }
@@ -417,7 +648,7 @@ class MainActivity : ComponentActivity() {
                         languages = localizedLanguages,
                         currentLangCode = viewModel.currentLang.value,
                         onLangChange = { lang ->
-                            val targetVersion = AssetManager.getModelVersionForLanguage(lang)
+                            val targetVersion = resolveModelVersion(lang)
                             if (targetVersion == "v1") {
                                 viewModel.currentLang.value = lang
                                 saveStringPref("selected_lang", lang)
@@ -458,6 +689,13 @@ class MainActivity : ComponentActivity() {
                                 val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
                                 startService(resetIntent)
                             }
+                        },
+                        preferredModelEngine = viewModel.preferredModelEngine.value,
+                        onPreferredModelEngineChange = { newEngine ->
+                            onPreferredModelEngineChanged(newEngine)
+                        },
+                        onCustomVoicesClick = {
+                            viewModel.showCustomVoicesDialog.value = true
                         },
 
                         isMixingEnabled = viewModel.isMixingEnabled.value,
@@ -533,6 +771,7 @@ class MainActivity : ComponentActivity() {
                         onHistoryClick = { historyLauncher.launch(Intent(this, HistoryActivity::class.java)) },
                         onQueueClick = { startActivity(Intent(this, QueueActivity::class.java)) },
                         onLexiconClick = { startActivity(Intent(this, LexiconActivity::class.java)) },
+                        onDeleteV1Click = { viewModel.showV1DeleteDialog.value = true },
                         onDeleteV2Click = { viewModel.showV2DeleteDialog.value = true },
                         onDeleteV3Click = { viewModel.showV3DeleteDialog.value = true },
                         onOpenEbookClick = { 
@@ -548,8 +787,9 @@ class MainActivity : ComponentActivity() {
                                 ebookLauncher.launch(arrayOf("application/epub+zip", "application/pdf"))
                             }
                         },
-                        isV2Ready = AssetManager.isV2Ready(this),
-                        isV3Ready = AssetManager.isV3Ready(this),
+                        canDeleteV1 = AssetManager.isV1Ready(this) && (AssetManager.isV2Ready(this) || AssetManager.isV3Ready(this)) && currentModelVersion != "v1",
+                        isV2Ready = AssetManager.isV2Ready(this) && (AssetManager.isV1Ready(this) || AssetManager.isV3Ready(this)),
+                        isV3Ready = AssetManager.isV3Ready(this) && (AssetManager.isV1Ready(this) || AssetManager.isV2Ready(this)),
 
                         canResume = viewModel.canResume.value,
                         onResumeClick = {
@@ -589,12 +829,21 @@ class MainActivity : ComponentActivity() {
     private fun loadPreferences() {
         val prefs = getSharedPreferences("SupertonicPrefs", MODE_PRIVATE)
         viewModel.inputText.value = "" // Do not load user text from cleartext storage
-        viewModel.currentLang.value = prefs.getString("selected_lang", MainViewModel.DEFAULT_LANG) ?: MainViewModel.DEFAULT_LANG
+        viewModel.preferredModelEngine.value = prefs.getString("preferred_model_engine", "default") ?: "default"
+        val rawLang = prefs.getString("selected_lang", MainViewModel.DEFAULT_LANG) ?: MainViewModel.DEFAULT_LANG
+        val targetVersion = resolveModelVersion(rawLang)
+        val sanitizedLang = AssetManager.sanitizeLanguageForModel(targetVersion, rawLang)
+        viewModel.currentLang.value = sanitizedLang
+        if (sanitizedLang != rawLang) {
+            saveStringPref("selected_lang", sanitizedLang)
+        }
         viewModel.selectedVoiceFile.value = prefs.getString("selected_voice", MainViewModel.DEFAULT_VOICE) ?: MainViewModel.DEFAULT_VOICE
         viewModel.selectedVoiceFile2.value = prefs.getString("selected_voice_2", MainViewModel.DEFAULT_VOICE_2) ?: MainViewModel.DEFAULT_VOICE_2
         viewModel.isMixingEnabled.value = prefs.getBoolean("is_mixing_enabled", false)
         viewModel.mixAlpha.floatValue = prefs.getFloat("mix_alpha", 0.5f)
-        viewModel.currentSpeed.floatValue = prefs.getFloat("speed", MainViewModel.DEFAULT_SPEED)
+        val rawSpeed = prefs.getFloat("speed", MainViewModel.DEFAULT_SPEED)
+        val validatedSpeed = if (rawSpeed.isNaN()) MainViewModel.DEFAULT_SPEED else rawSpeed
+        viewModel.currentSpeed.floatValue = com.brahmadeo.supertonic.tts.utils.PlaybackSpeedUtils.clampPlaybackSpeed(validatedSpeed)
         viewModel.currentSteps.intValue = prefs.getInt("diffusion_steps", MainViewModel.DEFAULT_STEPS)
         viewModel.isAdvancedNormalizationEnabled.value = prefs.getBoolean("is_advanced_normalization", false)
         val sMode = prefs.getInt("sibilance_reduction_mode", 1)
@@ -624,9 +873,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun startDownload(version: String) {
+    private fun startDownload(version: String, onComplete: ((String) -> Unit)? = null) {
         viewModel.startDownload(this, version) { completedVersion ->
-            initializeEngine(completedVersion)
+            if (onComplete != null) {
+                onComplete(completedVersion)
+            } else if (completedVersion == "v1" && viewModel.pendingEngineCode.isNotEmpty()) {
+                val engine = viewModel.pendingEngineCode
+                val lang = viewModel.pendingLangCode.ifEmpty { "en" }
+                viewModel.pendingEngineCode = ""
+                viewModel.pendingLangCode = ""
+                applyPreferredModelEngine(engine, "v1", lang)
+            } else {
+                initializeEngine(completedVersion)
+                val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
+                startService(resetIntent)
+            }
         }
     }
 
@@ -661,9 +922,11 @@ class MainActivity : ComponentActivity() {
                 SupertonicTTS.initialize(modelPath, libPath)
             }
 
-            if (success) {
-                withContext(Dispatchers.Main) {
-                    viewModel.isInitializing.value = false
+            withContext(Dispatchers.Main) {
+                viewModel.isInitializing.value = false
+                if (!success) {
+                    Log.e("MainActivity", "Failed to initialize engine for $version")
+                    Toast.makeText(this@MainActivity, "Failed to initialize TTS engine", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -719,6 +982,18 @@ class MainActivity : ComponentActivity() {
                     viewModel.voiceFiles[friendlyName] = file.name
                 }
             }
+        }
+
+        // Validate that currently selected voices exist in the updated map
+        if (!viewModel.voiceFiles.values.contains(viewModel.selectedVoiceFile.value)) {
+            val fallbackVoice = "F3.json"
+            viewModel.selectedVoiceFile.value = fallbackVoice
+            saveStringPref("selected_voice", fallbackVoice)
+        }
+        if (!viewModel.voiceFiles.values.contains(viewModel.selectedVoiceFile2.value)) {
+            val fallbackVoice2 = "M2.json"
+            viewModel.selectedVoiceFile2.value = fallbackVoice2
+            saveStringPref("selected_voice_2", fallbackVoice2)
         }
     }
 
@@ -819,6 +1094,211 @@ class MainActivity : ComponentActivity() {
             putExtra(PlaybackActivity.EXTRA_LANG, viewModel.currentLang.value)
         }
         startActivity(intent)
+    }
+
+    private fun importVoiceStyle(uri: Uri) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val inputStream = contentResolver.openInputStream(uri) ?: return@launch
+                val jsonString = inputStream.bufferedReader().use { it.readText() }
+                
+                // Simple validation
+                val jsonObject = org.json.JSONObject(jsonString)
+                val hasTtl = jsonObject.has("style_ttl")
+                val hasDp = jsonObject.has("style_dp")
+                
+                if (!hasTtl || !hasDp) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, getString(R.string.import_voice_style_invalid), Toast.LENGTH_LONG).show()
+                    }
+                    return@launch
+                }
+                
+                // Resolve name
+                var displayName: String? = null
+                try {
+                    contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                        val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex != -1 && cursor.moveToFirst()) {
+                            displayName = cursor.getString(nameIndex)
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                
+                val fileName = if (!displayName.isNullOrBlank()) {
+                    val name = displayName!!
+                    val baseName = if (name.endsWith(".json", ignoreCase = true)) {
+                        name.substring(0, name.length - 5)
+                    } else {
+                        name
+                    }
+                    val sanitizedBaseName = baseName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                    "$sanitizedBaseName.json"
+                } else {
+                    "custom_voice_${System.currentTimeMillis()}.json"
+                }
+                
+                // Save to active model version
+                val voiceDir = File(filesDir, "$currentModelVersion/voice_styles")
+                if (!voiceDir.exists()) {
+                    voiceDir.mkdirs()
+                }
+
+                val defaultVoiceFiles = setOf(
+                    "m1.json", "m2.json", "m3.json", "m4.json", "m5.json",
+                    "f1.json", "f2.json", "f3.json", "f4.json", "f5.json"
+                )
+                var candidateFileName = if (defaultVoiceFiles.contains(fileName.lowercase())) {
+                    "custom_$fileName"
+                } else {
+                    fileName
+                }
+
+                val baseName = candidateFileName.removeSuffix(".json")
+                var counter = 1
+                var destFile = File(voiceDir, candidateFileName)
+                while (destFile.exists()) {
+                    candidateFileName = "${baseName}_$counter.json"
+                    destFile = File(voiceDir, candidateFileName)
+                    counter++
+                }
+                val finalFileName = candidateFileName
+                destFile.writeText(jsonString)
+                
+                withContext(Dispatchers.Main) {
+                    // Refresh voice map
+                    setupVoicesMap(currentModelVersion, viewModel.currentLang.value)
+                    
+                    // Select new voice
+                    viewModel.selectedVoiceFile.value = finalFileName
+                    saveStringPref("selected_voice", finalFileName)
+                    
+                    // Reset playback service engine to reload style
+                    val resetIntent = Intent(this@MainActivity, PlaybackService::class.java).apply {
+                        action = "RESET_ENGINE"
+                    }
+                    startService(resetIntent)
+                    
+                    val friendlyName = finalFileName.removeSuffix(".json")
+                    Toast.makeText(
+                        this@MainActivity,
+                        getString(R.string.import_voice_style_success, friendlyName),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Failed to import voice style", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun deleteVoiceStyle() {
+        val voiceFile = viewModel.pendingDeleteVoiceFile.value ?: viewModel.selectedVoiceFile.value
+        viewModel.pendingDeleteVoiceFile.value = null
+        val defaultVoiceFiles = setOf(
+            "m1.json", "m2.json", "m3.json", "m4.json", "m5.json",
+            "f1.json", "f2.json", "f3.json", "f4.json", "f5.json"
+        )
+        if (defaultVoiceFiles.contains(voiceFile.lowercase())) return
+
+        try {
+            val file = File(filesDir, "$currentModelVersion/voice_styles/$voiceFile")
+            val deleted = file.exists() && file.delete()
+            if (!deleted) {
+                Toast.makeText(this, "Failed to delete voice style file", Toast.LENGTH_LONG).show()
+                return
+            }
+            
+            val friendlyName = voiceFile.removeSuffix(".json")
+            
+            // If the deleted voice was the currently selected voice, fall back to default
+            if (viewModel.selectedVoiceFile.value == voiceFile) {
+                val defaultVoice = MainViewModel.DEFAULT_VOICE
+                viewModel.selectedVoiceFile.value = defaultVoice
+                saveStringPref("selected_voice", defaultVoice)
+                
+                // Reset playback service engine to reload style
+                val resetIntent = Intent(this, PlaybackService::class.java).apply {
+                    action = "RESET_ENGINE"
+                }
+                startService(resetIntent)
+            }
+            
+            // Refresh voices list
+            setupVoicesMap(currentModelVersion, viewModel.currentLang.value)
+            
+            Toast.makeText(
+                this,
+                getString(R.string.delete_voice_success, friendlyName),
+                Toast.LENGTH_SHORT
+            ).show()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to delete voice style", e)
+            Toast.makeText(this, "Error deleting voice style: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun resolveModelVersion(lang: String): String {
+        return AssetManager.resolveModelVersion(viewModel.preferredModelEngine.value, lang)
+    }
+
+    private fun onPreferredModelEngineChanged(newEngine: String) {
+        val currentEngine = viewModel.preferredModelEngine.value
+        if (currentEngine == newEngine) return
+
+        // Resolve new active model version
+        val targetVersion = AssetManager.resolveModelVersion(newEngine, viewModel.currentLang.value)
+        val sanitizedLang = AssetManager.sanitizeLanguageForModel(targetVersion, viewModel.currentLang.value)
+
+        val isReady = AssetManager.isVersionReady(this, targetVersion)
+        if (!isReady) {
+            viewModel.pendingLangCode = sanitizedLang
+            viewModel.pendingEngineCode = newEngine
+            if (targetVersion == "v2") {
+                viewModel.showV2ConfirmDialog.value = true
+            } else if (targetVersion == "v3") {
+                viewModel.showV3ConfirmDialog.value = true
+            } else {
+                startDownload("v1") {
+                    viewModel.pendingEngineCode = ""
+                    viewModel.pendingLangCode = ""
+                    applyPreferredModelEngine(newEngine, "v1", sanitizedLang)
+                }
+            }
+            return
+        }
+
+        applyPreferredModelEngine(newEngine, targetVersion, sanitizedLang)
+    }
+
+    private fun applyPreferredModelEngine(newEngine: String, targetVersion: String, sanitizedLang: String) {
+        viewModel.preferredModelEngine.value = newEngine
+        saveStringPref("preferred_model_engine", newEngine)
+
+        if (sanitizedLang != viewModel.currentLang.value) {
+            viewModel.currentLang.value = sanitizedLang
+        }
+        saveStringPref("selected_lang", sanitizedLang)
+
+        currentModelVersion = targetVersion
+        setupVoicesMap(targetVersion, sanitizedLang)
+
+        if (!viewModel.voiceFiles.values.contains(viewModel.selectedVoiceFile.value)) {
+            val fallbackVoice = "F3.json"
+            viewModel.selectedVoiceFile.value = fallbackVoice
+            saveStringPref("selected_voice", fallbackVoice)
+        } else {
+            saveStringPref("selected_voice", viewModel.selectedVoiceFile.value)
+        }
+
+        switchModel(targetVersion)
+        val resetIntent = Intent(this, PlaybackService::class.java).apply { action = "RESET_ENGINE" }
+        startService(resetIntent)
     }
 
     private fun extractUrl(text: String): String? {

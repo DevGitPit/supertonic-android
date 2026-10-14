@@ -15,4 +15,6 @@ interface IPlaybackService {
     int getCurrentIndex();
     oneway void setSleepTimer(int minutes);
     int getSleepTimerSeconds();
+    oneway void setSpeed(float speed);
+    float getSpeed();
 }
