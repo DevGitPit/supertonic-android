@@ -180,4 +180,29 @@
     <string name="sibilance_low_pass">Gentle Low-Pass (8.0kHz)</string>
     <string name="sibilance_deesser_aggressive">Dynamic De-Esser (Aggressive)</string>
     <string name="sibilance_reduction_label">Sibilance Reduction / De-Esser</string>
+
+    <!-- Custom Voice Styles -->
+    <string name="import_voice_style_button">Import Custom Voice Style (.json)</string>
+    <string name="import_voice_style_invalid">Invalid voice style JSON file</string>
+    <string name="import_voice_style_success">Imported custom voice style: %1$s</string>
+    <string name="delete_voice_title">Delete Custom Voice?</string>
+    <string name="delete_voice_message">Are you sure you want to delete the custom voice \"%1$s\"? This cannot be undone.</string>
+    <string name="delete_voice_success">Deleted custom voice: %1$s</string>
+
+    <!-- Model Override & Custom Voices Manager -->
+    <string name="action_custom_voices">Custom Voices</string>
+    <string name="model_engine_label">Model Engine</string>
+    <string name="model_engine_default">Default (Language Optimized)</string>
+    <string name="model_engine_v1">Model v1 (Light / English)</string>
+    <string name="model_engine_v2">Model v2 (Medium / Multilingual)</string>
+    <string name="model_engine_v3">Model v3 (Heavy / Multilingual)</string>
+    <string name="custom_voices_title">Custom Voices</string>
+    <string name="custom_voices_desc">Manage your imported voice styles (.json files)</string>
+    <string name="close_button">Close</string>
+
+    <!-- Model v1 Deletion -->
+    <string name="action_delete_v1">Delete Model v1</string>
+    <string name="v1_delete_title">Delete Model v1?</string>
+    <string name="v1_delete_message">Are you sure you want to delete the Model v1 assets? This will free up ~255MB of storage. You can download them again later if needed.</string>
+    <string name="v1_deleted_msg">Model v1 deleted successfully</string>
 </resources>
